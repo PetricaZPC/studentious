@@ -4,13 +4,14 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../config/firebaseConfig";
 import { doc, getDoc } from 'firebase/firestore';
 import Link from "next/link";
-import { MdEdit, MdLogout } from "react-icons/md"; // Add MdLogout import
+import { MdEdit, MdLogout } from "react-icons/md"; 
 import Header from "@/components/Header";
 import Head from "next/head";
 import { useRouter } from 'next/router';
+import AuthGuard from '../components/AuthGuard';
 
 export default function Account() {
-  const { user, logout } = useAuth(); // Add logout from useAuth
+  const { user, logout } = useAuth(); 
   const [currentUser, setCurrentUser] = useState(user);
   const [error, setError] = useState("");
   const [profileImage, setProfileImage] = useState(null);
@@ -71,7 +72,7 @@ export default function Account() {
   }
 
 return (
-    <>
+    <AuthGuard>
         <Head>
             <title>Account | Studentious</title>
             <meta name="description" content="Manage your account settings" />
@@ -151,6 +152,6 @@ return (
                 </div>
             </div>
         </div>
-    </>
+    </AuthGuard>
 );
 }

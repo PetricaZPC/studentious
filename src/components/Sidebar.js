@@ -19,7 +19,7 @@ export default function Sidebar({ authors, categories }) {
           </ul>
         </div>
       </div>
-      {/* Categories and Recent Post sections remain the same */}
+
     </div>
   );
 }
