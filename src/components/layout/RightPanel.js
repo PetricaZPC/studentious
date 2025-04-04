@@ -1,5 +1,5 @@
 export default function RightPanel() {
-  // Sample payment data
+
   const payments = [
     { student: "Michael Brown", amount: "$135", date: "Apr 3, 2025" },
     { student: "Sarah Johnson", amount: "$90", date: "Apr 1, 2025" },
@@ -8,7 +8,7 @@ export default function RightPanel() {
 
   return (
     <aside className="w-80 bg-white dark:bg-gray-800 p-6 rounded-r-lg overflow-y-auto">
-      {/* Profile Section */}
+
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
           My Profile
@@ -30,7 +30,7 @@ export default function RightPanel() {
         </div>
       </div>
       
-      {/* Progress Section */}
+
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
           Course Progress
@@ -49,7 +49,7 @@ export default function RightPanel() {
         </div>
       </div>
       
-      {/* Upcoming Assignments */}
+
       <div>
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
           Upcoming Assignments

@@ -40,9 +40,8 @@ export default function EditAccount() {
     }
     
     if (user) {
-      // Only set the display name if user explicitly set it before
-      setDisplayName(user.displayName || ''); // This will set empty string if no displayName
-      console.log('Current user display name:', user.displayName); // Debug log
+      setDisplayName(user.displayName || ''); 
+      console.log('Current user display name:', user.displayName); 
       fetchProfileImage();
     }
   }, [user, router]);
@@ -82,7 +81,6 @@ export default function EditAccount() {
         const compressedFile = await compressImage(file);
         setSelectedImage(compressedFile);
 
-        // Create preview
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64String = reader.result;
@@ -130,7 +128,6 @@ export default function EditAccount() {
     }
   };
 
-  // Load profile image from cookie on mount
   useEffect(() => {
     const savedImage = Cookies.get('profileImage');
     if (savedImage) {
@@ -146,7 +143,6 @@ export default function EditAccount() {
       return;
     }
 
-    // Validate display name
     if (!displayName.trim()) {
       setError('Display name cannot be empty');
       return;
@@ -157,14 +153,12 @@ export default function EditAccount() {
     setMessage('');
 
     try {
-      // Update display name only if it changed
       if (displayName !== user.displayName) {
         await updateProfile(auth.currentUser, {
           displayName: displayName
         });
       }
 
-      // If there's a new image, store it in Firestore only
       if (selectedImage) {
         await handleImageUpload(selectedImage, user.uid);
       }
@@ -213,7 +207,6 @@ export default function EditAccount() {
                 <div className="flex flex-col items-center space-y-4">
                   <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-200">
                     {previewUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={previewUrl}
                         alt="Preview"

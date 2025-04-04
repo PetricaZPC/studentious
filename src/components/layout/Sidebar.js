@@ -6,7 +6,7 @@ export default function Sidebar() {
     { icon: "M19 19H5V8h14m0-5h-1V1h-2v2H8V1H6v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2m-2.47 8.06L15.47 10l-4.88 4.88-2.12-2.12-1.06 1.06L10.59 17l5.94-5.94z", label: "Calendar" },
   ];
 
-  // Function to render each nav item (replaces NavItem component)
+
   const renderNavItem = (item, index) => (
     <li key={index} className={`mt-3 p-2 ${item.active 
       ? "text-blue-600 dark:text-blue-300" 
@@ -22,7 +22,7 @@ export default function Sidebar() {
 
   return (
     <nav className="w-24 flex flex-col items-center bg-white dark:bg-gray-800 py-4">
-      {/* Logo (replaces NavLogo component) */}
+
       <div>
         <svg className="h-8 w-8 fill-current text-blue-600 dark:text-blue-300" viewBox="0 0 24 24">
           <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3m6.82 6L12 12.72 5.18 9 12 5.28 18.82 9M17 16l-5 2.72L7 16v-3.73L12 15l5-2.73V16z"></path>

@@ -1,5 +1,4 @@
 export default function MainContent() {
-  // Sample data for jobs
   const jobs = [
     {
       title: "Physics Tutor",
@@ -17,7 +16,7 @@ export default function MainContent() {
     }
   ];
 
-  // Sample data for lessons
+
   const lessons = [
     {
       subject: "Calculus I",
@@ -41,7 +40,7 @@ export default function MainContent() {
 
   return (
     <main className="my-1 pt-2 pb-2 px-10 flex-1 bg-gray-200 dark:bg-black rounded-l-lg transition duration-500 ease-in-out overflow-y-auto">
-      {/* Welcome Header Section */}
+
       <div className="pb-6">
         <header className="flex items-center justify-between">
           <div>
@@ -70,7 +69,7 @@ export default function MainContent() {
       </div>
       
       <div className="flex">
-        {/* Available Jobs Section */}
+
         <div className="flex-1 pr-5">
           <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
             Available Courses
@@ -111,7 +110,7 @@ export default function MainContent() {
           </div>
         </div>
 
-        {/* Today's Schedule Section */}
+
         <div className="w-2/5">
           <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
             Today's Schedule

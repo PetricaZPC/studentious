@@ -5,7 +5,8 @@ import {
   signOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { auth, db } from '../config/firebaseConfig'; // Adjust the import path as necessary
+import { auth, db } from '../config/firebaseConfig';
+
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 const AuthContext = createContext({});

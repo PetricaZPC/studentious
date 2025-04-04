@@ -23,6 +23,7 @@ import {
   parseISO,
   startOfToday,
 } from 'date-fns'
+import AuthGuard from '../components/AuthGuard';
 
 const Menu = dynamic(
   () => import('@headlessui/react').then(mod => mod.Menu),
@@ -158,7 +159,7 @@ function classNames(...classes) {
       )
     
 return (
-  <>
+  <AuthGuard>
   <Header />
     <Head>
       <title>Calendar | Studentious</title>
@@ -268,7 +269,7 @@ return (
       </main>
     </div>
     <Footer />
-  </>
+  </AuthGuard>
 )
 }
         
