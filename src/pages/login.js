@@ -1,181 +1,111 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
-
+import { useAuth } from '../context/AuthContext';
+import Head from 'next/head';
 
 export default function Login() {
   const [isLoginForm, setIsLoginForm] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login, signup } = useAuth();
+  const router = useRouter();
 
-  const toggleForm = () => {
-    setIsLoginForm(!isLoginForm);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isLoginForm) {
+        await login(email, password);
+      } else {
+        await signup(email, password, fullName);
+      }
+      router.push('/calendar');
+    } catch (error) {
+      setError(error.message);
+    }
+    setLoading(false);
   };
 
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-500 bg-no-repeat bg-cover relative"
-      style={{
-        backgroundImage: "url(https://images.unsplash.com/photo-1525302220185-c387a117886e?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80)"
-      }}
-    >
-      <div className="absolute bg-black opacity-60 inset-0 z-0"></div>
-      <div className="max-w-md w-full space-y-8 p-10 bg-white rounded-xl z-10">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            {isLoginForm ? "Welcome Back!" : "Create Account"}
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {isLoginForm ? "Please sign in to your account" : "Please register to get started"}
-          </p>
-        </div>
-        <div className="flex flex-row justify-center items-center space-x-3">
-          <span className="w-11 h-11 items-center justify-center inline-flex rounded-full font-bold text-lg text-white bg-blue-900 hover:shadow-lg cursor-pointer transition ease-in duration-300"></span>
-          <span className="w-11 h-11 items-center justify-center inline-flex rounded-full font-bold text-lg text-white bg-blue-400 hover:shadow-lg cursor-pointer transition ease-in duration-300"></span>
-          <span className="w-11 h-11 items-center justify-center inline-flex rounded-full font-bold text-lg text-white bg-blue-500 hover:shadow-lg cursor-pointer transition ease-in duration-300"></span>
-        </div>
-        <div className="flex items-center justify-center space-x-2">
-          <span className="h-px w-16 bg-gray-300"></span>
-          <span className="text-gray-500 font-normal">OR</span>
-          <span className="h-px w-16 bg-gray-300"></span>
-        </div>
-        
-        {isLoginForm ? (
-          // Login Form
-          <form className="mt-8 space-y-6" action="#" method="POST">
-            <input type="hidden" name="remember" value="true" />
-            <div className="relative">
-              <div className="absolute right-0 mt-4">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-green-500" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth="2"
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+    <>
+      <Head>
+        <title>{isLoginForm ? 'Login' : 'Sign Up'} | Studentious</title>
+      </Head>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              {isLoginForm ? 'Sign in to your account' : 'Create new account'}
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-600">
+              {isLoginForm ? "Don't have an account? " : "Already have an account? "}
+              <button
+                onClick={() => setIsLoginForm(!isLoginForm)}
+                className="font-medium text-purple-600 hover:text-purple-500"
+              >
+                {isLoginForm ? 'Sign up' : 'Sign in'}
+              </button>
+            </p>
+          </div>
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+              {error}
+            </div>
+          )}
+          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+            <div className="rounded-md shadow-sm -space-y-px">
+              {!isLoginForm && (
+                <div>
+                  <input
+                    type="text"
+                    required
+                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
+                    placeholder="Full Name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                   />
-                </svg>
-              </div>
-              <label className="text-sm font-bold text-gray-700 tracking-wide">Email</label>
-              <input 
-                className="w-full text-base py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500" 
-                type="email" 
-                placeholder="mail@gmail.com" 
-                defaultValue="mail@gmail.com"
-              />
-            </div>
-            <div className="mt-8 content-center">
-              <label className="text-sm font-bold text-gray-700 tracking-wide">
-                Password
-              </label>
-              <input 
-                className="w-full content-center text-base py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500" 
-                type="password" 
-                placeholder="Enter your password" 
-                defaultValue="*****"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input 
-                  id="remember_me" 
-                  name="remember_me" 
-                  type="checkbox" 
-                  className="h-4 w-4 bg-indigo-500 focus:ring-indigo-400 border-gray-300 rounded"
+                </div>
+              )}
+              <div>
+                <input
+                  type="email"
+                  required
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
-                <label htmlFor="remember_me" className="ml-2 block text-sm text-gray-900">
-                  Remember me
-                </label>
               </div>
-              <div className="text-sm">
-                <a href="#" className="font-medium text-indigo-500 hover:text-indigo-500">
-                  Forgot your password?
-                </a>
+              <div>
+                <input
+                  type="password"
+                  required
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
             </div>
             <div>
-              <button 
-                type="submit" 
-                className="w-full flex justify-center bg-indigo-500 text-gray-100 p-4 rounded-full tracking-wide
-                           font-semibold focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg cursor-pointer transition ease-in duration-300"
+              <button
+                type="submit"
+                disabled={loading}
+                className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
+                  loading ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
               >
-                Sign in
+                {loading ? 'Processing...' : isLoginForm ? 'Sign in' : 'Sign up'}
               </button>
             </div>
-            <p className="flex flex-col items-center justify-center mt-10 text-center text-md text-gray-500">
-              <span>Don&apos;t have an account?</span>
-              <button 
-                type="button"
-                onClick={toggleForm}
-                className="text-indigo-500 hover:text-indigo-500 hover:underline cursor-pointer transition ease-in duration-300"
-              >
-                Sign up
-              </button>
-            </p>
           </form>
-        ) : (
-          // Registration Form
-          <form className="mt-8 space-y-6" action="#" method="POST">
-            <div className="relative">
-              <label className="text-sm font-bold text-gray-700 tracking-wide">Full Name</label>
-              <input 
-                className="w-full text-base py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500" 
-                type="text" 
-                placeholder="John Doe" 
-              />
-            </div>
-            <div className="relative">
-              <label className="text-sm font-bold text-gray-700 tracking-wide">Email</label>
-              <input 
-                className="w-full text-base py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500" 
-                type="email" 
-                placeholder="mail@gmail.com" 
-              />
-            </div>
-            <div className="mt-8 content-center">
-              <label className="text-sm font-bold text-gray-700 tracking-wide">
-                Password
-              </label>
-              <input 
-                className="w-full content-center text-base py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500" 
-                type="password" 
-                placeholder="Enter your password" 
-              />
-            </div>
-            <div className="mt-8 content-center">
-              <label className="text-sm font-bold text-gray-700 tracking-wide">
-                Confirm Password
-              </label>
-              <input 
-                className="w-full content-center text-base py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500" 
-                type="password" 
-                placeholder="Confirm your password" 
-              />
-            </div>
-            <div>
-              <button 
-                type="submit" 
-                className="w-full flex justify-center bg-indigo-500 text-gray-100 p-4 rounded-full tracking-wide
-                           font-semibold focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg cursor-pointer transition ease-in duration-300"
-              >
-                Create Account
-              </button>
-            </div>
-            <p className="flex flex-col items-center justify-center mt-10 text-center text-md text-gray-500">
-              <span>Already have an account?</span>
-              <button 
-                type="button"
-                onClick={toggleForm}
-                className="text-indigo-500 hover:text-indigo-500 hover:underline cursor-pointer transition ease-in duration-300"
-              >
-                Sign in
-              </button>
-            </p>
-          </form>
-        )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

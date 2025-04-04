@@ -8,7 +8,7 @@ export default function Header() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-center">
         <div className="flex justify-between items-center">
           <div>
-            <a href="#" className="text-xl font-bold text-gray-800 md:text-2xl">
+            <a href="/" className="text-xl font-bold text-gray-800 md:text-2xl">
               <span className="text-purple-700">Student</span>
               ious
             </a>
@@ -26,10 +26,11 @@ export default function Header() {
           </div>
         </div>
         <div className={`flex-col md:flex md:flex-row md:-mx-4 ${isMobileMenuOpen ? 'block' : 'hidden'}`}>
-          <a href="#" className="my-1 text-gray-800 hover:text-purple-700 md:mx-4 md:my-0">Home</a>
+          <a href="/" className="my-1 text-gray-800 hover:text-purple-700 md:mx-4 md:my-0">Home</a>
           <a href="#" className="my-1 text-gray-800 hover:text-purple-700 md:mx-4 md:my-0">Blog</a>
-          <a href="#" className="my-1 text-gray-800 hover:text-purple-700 md:mx-4 md:my-0">About us</a>
-          <a href="#" className="my-1 text-gray-800 hover:text-purple-700 md:mx-4 md:my-0">Contact</a>
+          <a href="/calendar" className="my-1 text-gray-800 hover:text-purple-700 md:mx-4 md:my-0">Calendar</a>
+          <a href="/account" className="my-1 text-gray-800 hover:text-purple-700 md:mx-4 md:my-0">Account</a>
+         
         </div>
       </div>
     </nav>

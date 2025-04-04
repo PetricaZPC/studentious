@@ -1,10 +1,14 @@
 import dynamic from 'next/dynamic'
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import Image from 'next/image'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import { useRouter } from 'next/router'
+import { useAuth } from '../context/AuthContext'
+import { db } from '../config/firebaseConfig'
+import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore'
 import {
   add,
   eachDayOfInterval,
@@ -91,6 +95,45 @@ function classNames(...classes) {
   }
   
   export default function CalendarPage() {
+    const { user, logout } = useAuth();
+    const router = useRouter();
+    
+    useEffect(() => {
+      if (!user) {
+        router.push('/login');
+      }
+    }, [user, router]);
+  
+    const addMeeting = async (meetingData) => {
+      try {
+        await addDoc(collection(db, 'meetings'), {
+          ...meetingData,
+          userId: user.uid,
+          createdAt: serverTimestamp()
+        });
+      } catch (error) {
+        console.error('Error adding meeting:', error);
+      }
+    };
+  
+    const fetchMeetings = async () => {
+      try {
+        const q = query(
+          collection(db, 'meetings'), 
+          where('userId', '==', user.uid)
+        );
+        const querySnapshot = await getDocs(q);
+        const meetings = [];
+        querySnapshot.forEach((doc) => {
+          meetings.push({ id: doc.id, ...doc.data() });
+        });
+        return meetings;
+      } catch (error) {
+        console.error('Error fetching meetings:', error);
+        return [];
+      }
+    };
+
     let today = startOfToday()
     let [selectedDay, setSelectedDay] = useState(today)
     let [currentMonth, setCurrentMonth] = useState(format(today, 'MMM-yyyy'))
