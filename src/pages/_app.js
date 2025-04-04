@@ -1,7 +1,7 @@
-import { AuthProvider } from '../context/AuthContext';
+import { AuthProvider } from './api/context/AuthContext';
 import '../styles/globals.css';
 import { useRouter } from 'next/router';
-import AuthGuard from '../components/AuthGuard';
+import AuthGuard from './api/AuthGuard';
 
 const publicPaths = ['/login', '/signup', '/'];
 

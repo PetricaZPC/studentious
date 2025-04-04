@@ -6,8 +6,8 @@ import Image from 'next/image'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useRouter } from 'next/router'
-import { useAuth } from '../context/AuthContext'
-import { db } from '../config/firebaseConfig'
+import { useAuth } from './api/context/AuthContext'
+import { db } from './api/config/firebaseConfig'
 import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore'
 import {
   add,
@@ -23,7 +23,7 @@ import {
   parseISO,
   startOfToday,
 } from 'date-fns'
-import AuthGuard from '../components/AuthGuard';
+import AuthGuard from './api/AuthGuard';
 
 const Menu = dynamic(
   () => import('@headlessui/react').then(mod => mod.Menu),

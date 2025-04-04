@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from './api/context/AuthContext';
 import Head from 'next/head';
 
 export default function Login() {

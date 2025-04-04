@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from './api/context/AuthContext';
 import { updateProfile } from 'firebase/auth';
-import { auth, db } from '../config/firebaseConfig';
+import { auth, db } from './api/config/firebaseConfig';
 import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/router';
 import Header from '@/components/Header';

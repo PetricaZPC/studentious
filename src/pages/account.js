@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "./api/context/AuthContext";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../config/firebaseConfig";
+import { auth, db } from "./api/config/firebaseConfig";
 import { doc, getDoc } from 'firebase/firestore';
 import Link from "next/link";
 import { MdEdit, MdLogout } from "react-icons/md"; 
 import Header from "@/components/Header";
 import Head from "next/head";
 import { useRouter } from 'next/router';
-import AuthGuard from '../components/AuthGuard';
+import AuthGuard from './api/AuthGuard';
 
 export default function Account() {
   const { user, logout } = useAuth(); 
