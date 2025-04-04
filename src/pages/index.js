@@ -88,7 +88,7 @@ export default function HomePage() {
                     className={`px-3 py-2 mx-1 font-medium ${
                       currentPage === page 
                         ? 'bg-purple-700 text-white' 
-                        : 'text-gray-700 bg-white hover:bg-purple-500 hover:text-white'
+                        : 'text-gray-700 bg-white hover:bg-purple-400 hover:text-white'
                     } rounded-md`}
                   >
                     {page}
@@ -98,7 +98,7 @@ export default function HomePage() {
                 <button 
                   onClick={() => setCurrentPage(Math.min(3, currentPage + 1))}
                   disabled={currentPage === 3}
-                  className="px-3 py-2 mx-1 font-medium text-gray-700 bg-white rounded-md hover:bg-purple-500 hover:text-white disabled:cursor-not-allowed"
+                  className="px-3 py-2 mx-1 font-medium text-gray-700 bg-white rounded-md hover:bg-purple-400 hover:text-white disabled:cursor-not-allowed"
                 >
                   Next
                 </button>
