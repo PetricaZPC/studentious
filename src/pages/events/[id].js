@@ -1,39 +1,39 @@
-import { useParams } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import AuthGuard from "../api/AuthGuard";
 import Layout from "@/components/layout/Layout";
 import { useAuth } from "../api/context/AuthContext";
 import { useEffect, useState } from "react";
-import { collection, query, getDocs } from "firebase/firestore";
-import { db } from "../api/config/firebaseConfig";
+import { useRouter } from "next/router";
+import axios from "axios";
 
 export default function EventContainer() {
-    const { user, getAllEvents } = useAuth();
+    const { user } = useAuth();
     const [thisEvent, setThisEvent] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const { id } = useParams();
+    const router = useRouter();
+    const { id } = router.query; // Get the event ID from the URL
 
-    useEffect(() => {
-        const fetchEvent = async () => {
-            try {
+    useEffect(()=>{
+        const fetchEvent = async () =>{
+            try{
                 setLoading(true);
-                const events = await getAllEvents();
-                const event = events.find((event) => event.id === id);
-                setThisEvent(event);
-                console.log("Event fetched:", event);
-            } catch (err) {
-                console.error("Error fetching event:", err);
-            } finally {
+                const response = await fetch(`/api/events/${id}`);
+                if(!response){
+                    setError("Event not found.");
+                    return;
+                }else{
+                    setThisEvent(thisE);
+                    console.log(thisEvent);
+                }
+            }catch{
+                console.log("Error bad");
+            }finally{
                 setLoading(false);
-                console.log("Loading state set to false");
             }
-        };
-
-        if (user) {
-            fetchEvent();
         }
-    }, [id, user, getAllEvents]);
+    },[user])
 
     if (loading) {
         return (
@@ -48,13 +48,13 @@ export default function EventContainer() {
         );
     }
 
-    if (!thisEvent) {
+    if (error || !thisEvent) {
         return (
             <AuthGuard>
                 <Layout>
                     <Sidebar />
                     <div className="flex flex-col w-full h-full overflow-hidden bg-gray-100 dark:bg-gray-900">
-                        <p className="text-center text-gray-500 mt-10">Event not found.</p>
+                        <p className="text-center text-gray-500 mt-10">{error || "Event not found."}</p>
                     </div>
                 </Layout>
             </AuthGuard>
@@ -66,8 +66,8 @@ export default function EventContainer() {
             <Layout>
                 <Sidebar />
                 <div className="flex flex-col w-full h-full overflow-hidden bg-white-100 dark:bg-gray-900 z-12 justify-center items-center p-6">
-                    <h1 className="text-3xl font-bold mb-4">Titlul evenimentului: {thisEvent.title}</h1>
-                    <p className="text-gray-700 mb-4">Descriere: {thisEvent.description}</p>
+                    <h1 className="text-3xl font-bold mb-4">Event Title: {thisEvent.title}</h1>
+                    <p className="text-gray-700 mb-4">Description: {thisEvent.description}</p>
                     <p className="text-gray-500">
                         <strong>Location:</strong> {thisEvent.location || "Virtual"}
                     </p>
@@ -76,9 +76,10 @@ export default function EventContainer() {
                     </p>
                     <p className="text-gray-500">
                         <strong>End Time:</strong> {new Date(thisEvent.endTime).toLocaleString()}
-                    </p>
+                    </p>p
                 </div>
             </Layout>
-        </AuthGuard>
-    );
+        </AuthGuard> 
+    );   
+
 }

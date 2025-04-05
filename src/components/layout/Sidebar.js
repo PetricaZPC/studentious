@@ -188,7 +188,7 @@ const Sidebar = React.memo(function Sidebar() {
               />
             </svg>
           }
-          label="Study"
+          label="Courses"
           active={isCourses}
           href="/courses"
         />
