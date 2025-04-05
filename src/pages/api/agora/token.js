@@ -13,6 +13,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
+
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
   
   try {
     // SIMPLIFIED AUTH FOR DEVELOPMENT
@@ -38,16 +42,16 @@ export default async function handler(req, res) {
       userName = user.name || user.email;
     }
 
-    const { channel } = req.query;
-    if (!channel) {
+    const { channelName } = req.query;
+    if (!channelName) {
       return res.status(400).json({ message: "Channel name is required" });
     }
 
     // Get Agora credentials from environment variables
-    const appID = process.env.AGORA_APP_ID;
+    const appId = process.env.AGORA_APP_ID;
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
 
-    if (!appID || !appCertificate) {
+    if (!appId || !appCertificate) {
       return res.status(500).json({ message: "Agora credentials not configured" });
     }
 
@@ -59,19 +63,19 @@ export default async function handler(req, res) {
 
     // Generate the Agora token
     const token = RtcTokenBuilder.buildTokenWithUid(
-      appID,
+      appId,
       appCertificate,
-      channel,
+      channelName,
       uid,
       RtcRole.PUBLISHER,
       privilegeExpiredTs
     );
 
     return res.status(200).json({
-      appId: appID,
+      appId,
       token,
       uid,
-      channel,
+      channelName,
       userId,
       userName,
       timestamp: Date.now(), // Add timestamp for debugging
