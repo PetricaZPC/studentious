@@ -131,6 +131,33 @@ export default function VideoComponent({ roomId, onLeave }) {
           videoTrack.play(localVideoRef.current);
         }
 
+        // Add user-joined listener
+        agoraClient.current.on('user-joined', async (user) => {
+          console.log(`User ${user.uid} joined the channel`);
+          
+          // Immediately add user to remoteUsers with placeholder data
+          setRemoteUsers(prev => ({
+            ...prev,
+            [user.uid]: { 
+              ...prev[user.uid], 
+              uid: user.uid,
+              name: `User-${user.uid}`,
+              hasJoined: true
+            }
+          }));
+          
+          // Update participant count immediately when someone joins
+          updateParticipantCount();
+        });
+
+        // Add helper function to update participant count
+        const updateParticipantCount = () => {
+          // Need to manually count since remoteUsers state might not be updated yet
+          const count = 1 + Object.keys(agoraClient.current.remoteUsers).length;
+          console.log(`Updating participant count to ${count}`);
+          setParticipantCount(count);
+        };
+
         // Handle remote users
         const handleUserPublished = async (user, mediaType) => {
           await agoraClient.current.subscribe(user, mediaType);
@@ -150,33 +177,58 @@ export default function VideoComponent({ roomId, onLeave }) {
           if (mediaType === 'video') {
             setRemoteUsers(prev => ({
               ...prev,
-              [user.uid]: { ...prev[user.uid], videoTrack: user.videoTrack, name: userName }
+              [user.uid]: { 
+                ...prev[user.uid], 
+                videoTrack: user.videoTrack, 
+                name: userName 
+              }
             }));
             
-            user.videoTrack.play(`remote-video-${user.uid}`);
+            setTimeout(() => {
+              try {
+                const videoContainer = document.getElementById(`remote-video-${user.uid}`);
+                if (videoContainer && user.videoTrack) {
+                  user.videoTrack.play(videoContainer);
+                }
+              } catch (err) {
+                console.warn(`Error playing video for user ${user.uid}:`, err);
+              }
+            }, 200);
           }
           
           if (mediaType === 'audio') {
             setRemoteUsers(prev => ({
               ...prev,
-              [user.uid]: { ...prev[user.uid], audioTrack: user.audioTrack, name: userName }
+              [user.uid]: { 
+                ...prev[user.uid], 
+                audioTrack: user.audioTrack, 
+                name: userName 
+              }
             }));
-            user.audioTrack.play();
+            
+            if (user.audioTrack) {
+              user.audioTrack.play();
+            }
           }
-
-          setParticipantCount(Object.keys(remoteUsers).length + 1);
+          
+          // Update participant count
+          updateParticipantCount();
         };
 
         agoraClient.current.on('user-published', handleUserPublished);
 
-        // Handle user left
+        // Replace the existing user-left handler
         agoraClient.current.on('user-left', (user) => {
+          console.log(`User ${user.uid} left the channel`);
+          
           setRemoteUsers(prev => {
             const next = { ...prev };
             delete next[user.uid];
             return next;
           });
-          setParticipantCount(prevCount => prevCount - 1);
+          
+          // Use the helper function
+          updateParticipantCount();
         });
 
         setLoading(false);

@@ -25,21 +25,30 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "Channel name is required" });
     }
 
-    // Use device fingerprint to create a consistent ID for this user on this device
-    const userIdBase = deviceId || req.headers['user-agent'] || 'anonymous';
-    
-    // Generate a numeric UID from the user ID
-    // Extract digits and ensure it's within 32-bit range
-    let uidStr = '';
-    for (let i = 0; i < userIdBase.length; i++) {
-      const code = userIdBase.charCodeAt(i);
-      uidStr += (code % 10).toString();
-      if (uidStr.length >= 8) break;
-    }
-    
-    // Ensure UID is a valid number and unique
-    const uid = parseInt(uidStr) || Math.floor(100000 + Math.random() * 900000);
-    
+    // Generate a unique UID for this user
+    // Make the uid calculation more random but still numeric
+    const generateNumericUid = (deviceId) => {
+      const timestamp = Date.now().toString().slice(-6);
+      const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      let hash = 0;
+      
+      // If we have a deviceId, incorporate it
+      if (deviceId) {
+        for (let i = 0; i < deviceId.length; i++) {
+          hash = ((hash << 5) - hash) + deviceId.charCodeAt(i);
+          hash |= 0; // Convert to 32bit integer
+        }
+        hash = Math.abs(hash) % 1000000; // Keep it under 7 digits
+      } else {
+        hash = Math.floor(Math.random() * 1000000);
+      }
+      
+      // Use only the last few digits to create a small number
+      return parseInt(`${hash}${randomPart.slice(-2)}`.slice(-7));
+    };
+
+    const uid = generateNumericUid(deviceId);
+
     // Get credentials from environment variables
     const appID = process.env.AGORA_APP_ID;
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
@@ -69,14 +78,14 @@ export default async function handler(req, res) {
       token,
       uid,
       channel: channelName,
-      userId: userIdBase.substring(0, 8),
-      userName: `User-${uid.toString().substring(0, 4)}`,
+      userName: `User-${uid.toString().slice(-4)}`,
       turnServer: {
         url: 'turn:global.turn.twilio.com:3478?transport=udp',
-        username: uid.toString(),
+        username: `${uid}`,
         credential: token.substring(0, 16)
       },
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      environment: process.env.NODE_ENV
     });
   } catch (error) {
     console.error("Error generating Agora token:", error);
