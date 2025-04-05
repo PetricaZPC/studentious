@@ -1,32 +1,51 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/pages/api/context/AuthContext';
+import { IoClose, IoDocument, IoVolumeHigh, IoPause, IoPlay, IoCheckmarkCircle, IoWarning, IoCalendar, IoTime, IoEye, IoCloudDownload, IoSparkles, IoMenu } from 'react-icons/io5';
 
 export default function CoursesContent() {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [courseName, setCourseName] = useState('');
-  const [courseDescription, setCourseDescription] = useState('');
-  const [file, setFile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // File upload state
+  const [file, setFile] = useState(null);
+  const [courseName, setCourseName] = useState('');
+  const [courseDescription, setCourseDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Summary state
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summarizingCourseId, setSummarizingCourseId] = useState(null);
+  
+  // Viewer state
   const [viewingCourse, setViewingCourse] = useState(null);
   const [viewingSummary, setViewingSummary] = useState(null);
-  const [summarizingCourseId, setSummarizingCourseId] = useState(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchCourses();
-    }
-  }, [user]);
+  // Audio state
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [generatingAudioForCourse, setGeneratingAudioForCourse] = useState(null);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
+  const audioRef = useRef(null);
 
+  // Animation state
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+
+  // Sidebar state for mobile views
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+
+  // Toggle sidebar visibility for mobile views
+  const toggleSidebar = () => {
+    setSidebarVisible(!sidebarVisible);
+    document.body.classList.toggle('sidebar-open');
+  };
+
+  // Fetch courses
   const fetchCourses = async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       const response = await fetch('/api/courses/list', {
-        method: 'GET',
         credentials: 'include'
       });
       
@@ -35,33 +54,45 @@ export default function CoursesContent() {
       }
       
       const data = await response.json();
-      setCourses(data.courses);
+      setCourses(data.courses || []);
     } catch (err) {
       console.error('Error fetching courses:', err);
+      setError('Failed to load courses');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchCourses();
+    
+    // Cleanup audio on unmount
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  // File upload handler
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
-    if (!selectedFile) return;
-    
-    const fileType = selectedFile.name.split('.').pop().toLowerCase();
-    if (fileType !== 'pdf' && fileType !== 'doc' && fileType !== 'docx') {
-      setError('Please upload only PDF or Word documents');
-      setFile(null);
-      return;
+    if (selectedFile) {
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        setError('File size exceeds 5MB limit');
+        return;
+      }
+      
+      const fileType = selectedFile.name.split('.').pop().toLowerCase();
+      if (fileType !== 'pdf' && fileType !== 'doc' && fileType !== 'docx') {
+        setError('Only PDF and Word documents are allowed');
+        return;
+      }
+      
+      setFile(selectedFile);
+      setError('');
     }
-    
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setError('File size must be less than 5MB');
-      setFile(null);
-      return;
-    }
-    
-    setFile(selectedFile);
-    setError('');
   };
 
   const handleSubmit = async (e) => {
@@ -148,304 +179,603 @@ export default function CoursesContent() {
     }
   };
 
+  const generateAudio = async (course) => {
+    if (isGeneratingAudio) return;
+    
+    try {
+      setIsGeneratingAudio(true);
+      setGeneratingAudioForCourse(course._id);
+      setError('');
+      setSuccess('');
+      
+      const textToConvert = course.summarized ? course.summary : course.description;
+      
+      if (!textToConvert || textToConvert.trim() === '') {
+        setError('No content available to convert to audio');
+        setIsGeneratingAudio(false);
+        setGeneratingAudioForCourse(null);
+        return;
+      }
+      
+      const response = await fetch('/api/courses/generate-audio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseId: course._id,
+          text: textToConvert
+        }),
+        credentials: 'include'
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate audio');
+      }
+      
+      setSuccess('Audio generated successfully!');
+      setShowSuccessAnimation(true);
+      setTimeout(() => setShowSuccessAnimation(false), 3000);
+      
+      await fetchCourses();
+      
+    } catch (err) {
+      console.error('Error generating audio:', err);
+      setError('Failed to generate audio: ' + err.message);
+    } finally {
+      setIsGeneratingAudio(false);
+      setGeneratingAudioForCourse(null);
+    }
+  };
+
+  const toggleAudio = (course) => {
+    const hasAudio = course.audioUrl || course.audioId;
+    if (!hasAudio) {
+      setError('No audio available for this course');
+      return;
+    }
+    
+    if (currentlyPlaying === course._id) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setCurrentlyPlaying(null);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      const timestamp = Date.now();
+      const audioSource = `/api/courses/audio/${course.audioId}?t=${timestamp}`;
+      
+      audioRef.current = new Audio(audioSource);
+      
+      audioRef.current.addEventListener('error', (e) => {
+        console.error('Audio error event:', e);
+        console.error('Audio error code:', audioRef.current.error?.code);
+        console.error('Audio error message:', audioRef.current.error?.message);
+        setError('Error loading audio. Try downloading instead.');
+        setCurrentlyPlaying(null);
+      });
+      
+      audioRef.current.play()
+        .then(() => {
+          console.log('Audio playback started successfully');
+        })
+        .catch(err => {
+          console.error('Error playing audio:', err);
+          setError('Failed to play audio. Try downloading instead.');
+          setCurrentlyPlaying(null);
+        });
+      
+      audioRef.current.addEventListener('ended', () => {
+        setCurrentlyPlaying(null);
+      });
+      
+      setCurrentlyPlaying(course._id);
+    }
+  };
+
   const viewCourse = (course) => {
     setViewingCourse(course);
   };
-
-  const viewSummary = (course) => {
-    setViewingSummary(course);
-  };
-
+  
   const closeViewer = () => {
     setViewingCourse(null);
   };
-
+  
+  const viewSummary = (course) => {
+    setViewingSummary(course);
+  };
+  
   const closeSummaryViewer = () => {
     setViewingSummary(null);
   };
 
-  return (<div className="w-full max-w-6xl mx-auto">
-    <div className="flex flex-col items-center min-h-screen bg-gray-50 p-6 ">
-      <div className="w-full max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-center mb-8">Course Management</h1>
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 pl-0 md:pl-64 transition-all duration-300 overflow-y-auto">
+        {/* Mobile sidebar toggle */}
+        <div className="fixed top-4 left-4 z-40 md:hidden">
+          <button 
+            onClick={toggleSidebar}
+            className="p-2 rounded-full bg-white shadow-md text-indigo-600 hover:bg-indigo-50"
+            aria-label="Toggle sidebar"
+          >
+            <IoMenu className="h-6 w-6" />
+          </button>
+        </div>
         
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Upload New Course</h2>
+        {/* Main scrollable container with proper padding */}
+        <div className="px-4 py-8 sm:px-6 lg:px-8 pb-32 relative">
+          {/* Beautiful gradient header */}
+          <div className="relative mb-12 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-600 rounded-xl opacity-90"></div>
+            <div className="absolute inset-0 bg-pattern opacity-10"></div>
+            <div className="relative px-6 py-10 sm:px-10 sm:py-14 text-center">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">
+                Course Management
+              </h1>
+              <p className="max-w-2xl mx-auto text-blue-100 text-lg">
+                Upload, summarize, and create audio podcasts from your course materials
+              </p>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500"></div>
+          </div>
           
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Course Name
-              </label>
-              <input
-                type="text"
-                value={courseName}
-                onChange={(e) => setCourseName(e.target.value)}
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Enter course name"
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Description (Optional)
-              </label>
-              <textarea
-                value={courseDescription}
-                onChange={(e) => setCourseDescription(e.target.value)}
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Enter course description"
-                rows="3"
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Upload Document (PDF or Word)
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                <div className="space-y-1 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" 
-                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <div className="flex text-sm text-gray-600 justify-center">
-                    <label className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none">
-                      <span>Upload a file</span>
-                      <input type="file" className="sr-only" onChange={handleFileChange} accept=".pdf,.doc,.docx" />
-                    </label>
+          <div className="max-w-7xl mx-auto">
+            {/* Improved notifications */}
+            {success && (
+              <div className={`mb-8 bg-green-50 border-l-4 border-green-400 shadow-md rounded-lg overflow-hidden transition-all duration-300 ${showSuccessAnimation ? 'transform scale-[1.02]' : ''}`}>
+                <div className="p-4 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 bg-green-100 rounded-full p-1">
+                      <IoCheckmarkCircle className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-green-800">{success}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500">PDF or Word up to 5MB</p>
+                  <button 
+                    onClick={() => setSuccess('')}
+                    className="flex-shrink-0 ml-4 p-1 rounded-full hover:bg-green-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-400"
+                  >
+                    <IoClose className="h-5 w-5 text-green-500" />
+                  </button>
                 </div>
               </div>
-              {file && (
-                <p className="mt-2 text-sm text-gray-500">
-                  Selected: {file.name} ({Math.round(file.size / 1024)} KB)
-                </p>
-              )}
-            </div>
+            )}
             
             {error && (
-              <div className="mb-4 text-red-500 text-sm">{error}</div>
-            )}
-            
-            {success && (
-              <div className="mb-4 text-green-500 text-sm">{success}</div>
-            )}
-            
-            <div className="flex items-center justify-between">
-              <button
-                type="submit"
-                disabled={isUploading || isSummarizing}
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50"
-              >
-                {isUploading ? 'Uploading...' : isSummarizing ? 'Summarizing...' : 'Upload Course'}
-              </button>
-            </div>
-          </form>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">My Courses</h2>
-          
-          {loading ? (
-            <div className="text-center py-4">
-              <div className="spinner border-t-4 border-blue-500 border-solid rounded-full w-8 h-8 mx-auto animate-spin"></div>
-              <p className="mt-2 text-gray-500">Loading courses...</p>
-            </div>
-          ) : courses.length === 0 ? (
-            <div className="text-center py-6 text-gray-500">
-              <p>You haven't uploaded any courses yet.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {courses.map(course => (
-                <div key={course._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-semibold text-lg">{course.name}</h3>
-                    <span className={`text-xs px-2 py-1 rounded ${course.fileType === 'pdf' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
-                      {course.fileType.toUpperCase()}
-                    </span>
-                  </div>
-                  
-                  {course.description && (
-                    <p className="text-gray-600 text-sm mt-1">{course.description}</p>
-                  )}
-                  
-                  {course.summarized && (
-                    <div className="mt-3 bg-gray-50 p-3 rounded-md">
-                      <div className="flex justify-between items-center">
-                        <h4 className="text-sm font-medium mb-1">AI Summary:</h4>
-                        <button
-                          onClick={() => viewSummary(course)}
-                          className="text-xs text-blue-500 hover:text-blue-700"
-                        >
-                          View Full Summary
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-700 line-clamp-3">{course.summary.split('\n')[0]}</p>
+              <div className="mb-8 bg-red-50 border-l-4 border-red-400 shadow-md rounded-lg overflow-hidden">
+                <div className="p-4 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 bg-red-100 rounded-full p-1">
+                      <IoWarning className="h-6 w-6 text-red-500" />
                     </div>
-                  )}
-                  
-                  <div className="mt-4 flex justify-between items-center text-sm">
-                    <span className="text-gray-500">
-                      Uploaded: {course.createdAt ? new Date(course.createdAt).toLocaleDateString() : 'Unknown date'}
-                    </span>
-                    
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => viewCourse(course)}
-                        className="text-blue-500 hover:text-blue-700 flex items-center"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                        </svg>
-                        View
-                      </button>
-                      
-                      <a 
-                        href={course.fileUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-blue-500 hover:text-blue-700 flex items-center"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Download
-                      </a>
-                      
-                      {!course.summarized && (
-                        <button
-                          onClick={() => generateSummary(course._id, course.fileUrl, course.fileType)}
-                          disabled={summarizingCourseId === course._id}
-                          className="text-green-500 hover:text-green-700 flex items-center disabled:opacity-50"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm11 1H6v8l4-2 4 2V6z" clipRule="evenodd" />
-                          </svg>
-                          {summarizingCourseId === course._id ? 'Summarizing...' : 'Summarize'}
-                        </button>
-                      )}
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-red-800">{error}</p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-    
-    {viewingCourse && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg w-full max-w-4xl h-5/6 flex flex-col">
-          <div className="flex justify-between items-center p-4 border-b">
-            <h3 className="text-lg font-semibold">{viewingCourse.name}</h3>
-            <div className="flex items-center">
-              {viewingCourse.summarized && (
-                <button
-                  onClick={() => {
-                    closeViewer();
-                    viewSummary(viewingCourse);
-                  }}
-                  className="mr-4 text-blue-500 hover:text-blue-700 flex items-center"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm11 1H6v8l4-2 4 2V6z" clipRule="evenodd" />
-                  </svg>
-                  View Summary
-                </button>
-              )}
-              <button onClick={closeViewer} className="text-gray-500 hover:text-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex-1 overflow-auto p-4">
-            {viewingCourse.fileType === 'pdf' ? (
-              <iframe 
-                src={viewingCourse.fileUrl} 
-                className="w-full h-full border-none" 
-                title={viewingCourse.name}
-              ></iframe>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <p className="mb-4 text-gray-600">Word documents can't be previewed directly.</p>
-                  <a 
-                    href={viewingCourse.fileUrl} 
-                    target="_blank"
-                    rel="noopener noreferrer" 
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  <button 
+                    onClick={() => setError('')}
+                    className="flex-shrink-0 ml-4 p-1 rounded-full hover:bg-red-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-400"
                   >
-                    Download to View
-                  </a>
+                    <IoClose className="h-5 w-5 text-red-500" />
+                  </button>
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    )}
-
-    {viewingSummary && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg w-full max-w-4xl h-5/6 flex flex-col">
-          <div className="flex justify-between items-center p-4 border-b">
-            <h3 className="text-lg font-semibold">
-              Summary: {viewingSummary.name}
-            </h3>
-            <div className="flex items-center">
-              <button
-                onClick={() => {
-                  closeSummaryViewer();
-                  viewCourse(viewingSummary);
-                }}
-                className="mr-4 text-blue-500 hover:text-blue-700 flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                </svg>
-                View Document
-              </button>
-              <button onClick={closeSummaryViewer} className="text-gray-500 hover:text-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+            
+            {/* Layout grid for desktop, stack for mobile */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+              {/* Upload form - Left column on desktop, top on mobile */}
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100">
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                    <h2 className="text-xl font-bold text-white flex items-center">
+                      <svg className="h-6 w-6 mr-2 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      Upload New Course
+                    </h2>
+                  </div>
+                  <div className="p-6">
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                      <div>
+                        <label className="block text-gray-700 text-sm font-medium mb-2">
+                          Course Name
+                        </label>
+                        <input
+                          type="text"
+                          value={courseName}
+                          onChange={(e) => setCourseName(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+                          placeholder="Enter course name"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-gray-700 text-sm font-medium mb-2">
+                          Description (Optional)
+                        </label>
+                        <textarea
+                          value={courseDescription}
+                          onChange={(e) => setCourseDescription(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+                          placeholder="Enter course description"
+                          rows="3"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-gray-700 text-sm font-medium mb-2">
+                          Upload Document (PDF or Word)
+                        </label>
+                        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:bg-gray-50 transition cursor-pointer group">
+                          <div className="space-y-2 text-center">
+                            <svg className="mx-auto h-12 w-12 text-gray-400 group-hover:text-indigo-500 transition duration-300" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" 
+                                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            <div className="flex text-sm text-gray-600 justify-center">
+                              <label className="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-700 focus-within:outline-none">
+                                <span>Upload a file</span>
+                                <input type="file" className="sr-only" onChange={handleFileChange} accept=".pdf,.doc,.docx" />
+                              </label>
+                            </div>
+                            <p className="text-xs text-gray-500">PDF or Word up to 5MB</p>
+                          </div>
+                        </div>
+                        {file && (
+                          <div className="mt-3 flex items-center text-sm text-gray-600 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                            <IoDocument className="h-5 w-5 mr-2 text-indigo-500" />
+                            <div className="overflow-hidden">
+                              <p className="truncate font-medium">{file.name}</p>
+                              <p className="text-xs text-gray-500">({Math.round(file.size / 1024)} KB)</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="pt-3">
+                        <button
+                          type="submit"
+                          disabled={isUploading || isSummarizing}
+                          className="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isUploading ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Uploading...
+                            </>
+                          ) : isSummarizing ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Summarizing...
+                            </>
+                          ) : 'Upload Course'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Courses list - Right column on desktop, bottom on mobile */}
+              <div className="lg:col-span-2">
+                <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100">
+                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
+                    <h2 className="text-xl font-bold text-white flex items-center">
+                      <svg className="h-6 w-6 mr-2 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      My Courses
+                    </h2>
+                  </div>
+                  <div className="p-6">
+                    {isLoading ? (
+                      <div className="flex flex-col items-center justify-center py-12">
+                        <div className="relative w-24 h-24">
+                          <div className="absolute inset-0 rounded-full border-t-4 border-b-4 border-indigo-500 animate-spin"></div>
+                          <div className="absolute inset-2 rounded-full border-r-4 border-l-4 border-purple-500 animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
+                          <div className="absolute inset-4 rounded-full border-t-4 border-b-4 border-blue-500 animate-spin" style={{animationDuration: '2s'}}></div>
+                        </div>
+                        <p className="mt-4 text-indigo-700 font-medium">Loading your courses...</p>
+                      </div>
+                    ) : courses.length === 0 ? (
+                      <div className="text-center py-16 bg-gradient-to-b from-white to-indigo-50 rounded-xl border border-indigo-100">
+                        <div className="bg-white h-24 w-24 rounded-full shadow-md flex items-center justify-center mx-auto mb-4 border border-indigo-100">
+                          <IoDocument className="h-12 w-12 text-indigo-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">No Courses Yet</h3>
+                        <p className="text-gray-600 max-w-md mx-auto mb-8">Upload your first course to start learning and creating audio summaries.</p>
+                        <button 
+                          onClick={() => document.querySelector('input[type="file"]').click()}
+                          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                        >
+                          <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          Upload Your First Course
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-6">
+                        {courses.map(course => (
+                          <div 
+                            key={course._id} 
+                            className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl border border-gray-100 hover:border-indigo-200 transition-all duration-300 flex flex-col"
+                          >
+                            {/* Course Header - Gradient background with name and type badge */}
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100 p-4">
+                              <div className="flex justify-between items-start">
+                                <h3 className="font-bold text-lg text-gray-800 leading-tight line-clamp-1">{course.name}</h3>
+                                <span className={`ml-2 flex-shrink-0 text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                                  course.fileType === 'pdf' ? 'bg-red-100 text-red-800' : 
+                                  course.fileType === 'doc' || course.fileType === 'docx' ? 'bg-blue-100 text-blue-800' : 
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {course.fileType?.toUpperCase() || 'DOC'}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Course Content */}
+                            <div className="p-4 flex-grow">
+                              {course.description && (
+                                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{course.description}</p>
+                              )}
+                              
+                              <div className="space-y-3">
+                                {/* Summary Section */}
+                                {course.summarized && (
+                                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors duration-200">
+                                    <div className="flex justify-between items-center mb-2">
+                                      <div className="flex items-center">
+                                        <IoSparkles className="h-4 w-4 text-indigo-500 mr-2" />
+                                        <h4 className="text-sm font-semibold text-gray-700">AI Summary</h4>
+                                      </div>
+                                      <button
+                                        onClick={() => viewSummary(course)}
+                                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors duration-200 hover:underline"
+                                      >
+                                        View Full
+                                      </button>
+                                    </div>
+                                    <p className="text-sm text-gray-700 line-clamp-3 italic">{course.summary?.split('\n')[0]}</p>
+                                  </div>
+                                )}
+                                
+                                {/* Audio Section */}
+                                {(course.audioId || course.audioUrl) && (
+                                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4 hover:border-blue-300 transition-colors duration-200">
+                                    <div className="flex justify-between items-center mb-2">
+                                      <div className="flex items-center">
+                                        <IoVolumeHigh className="h-4 w-4 text-blue-600 mr-2" />
+                                        <h4 className="text-sm font-semibold text-blue-800">Audio Podcast</h4>
+                                      </div>
+                                      <div className="flex space-x-2">
+                                        <button
+                                          onClick={() => toggleAudio(course)}
+                                          aria-label={currentlyPlaying === course._id ? "Pause audio" : "Play audio"}
+                                          className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${
+                                            currentlyPlaying === course._id 
+                                              ? 'bg-blue-600 text-white' 
+                                              : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'
+                                          } transition-colors duration-200 shadow-sm`}
+                                        >
+                                          {currentlyPlaying === course._id ? (
+                                            <IoPause className="h-4 w-4" />
+                                          ) : (
+                                            <IoPlay className="h-4 w-4" />
+                                          )}
+                                        </button>
+                                        
+                                        <a 
+                                          href={`/api/courses/audio/${course.audioId}?download=true`}
+                                          aria-label="Download audio"
+                                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors duration-200 shadow-sm"
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          <IoCloudDownload className="h-4 w-4" />
+                                        </a>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center text-xs text-blue-700 mt-1">
+                                      <IoTime className="h-3 w-3 mr-1.5" />
+                                      <span>Generated: {course.audioGeneratedAt ? new Date(course.audioGeneratedAt).toLocaleString() : 'Recently'}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Course Actions Footer */}
+                            <div className="bg-gray-50 border-t border-gray-100 px-4 py-3">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <span className="text-xs text-gray-500 flex items-center">
+                                  <IoCalendar className="h-3 w-3 mr-1.5" />
+                                  <span className="whitespace-nowrap">
+                                    {course.createdAt ? new Date(course.createdAt).toLocaleDateString() : 'Unknown date'}
+                                  </span>
+                                </span>
+                                
+                                <div className="flex flex-wrap gap-2">
+                                  {/* View Button */}
+                                  <button
+                                    onClick={() => viewCourse(course)}
+                                    className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors duration-200"
+                                  >
+                                    <IoEye className="h-3.5 w-3.5 mr-1.5" />
+                                    View
+                                  </button>
+                                  
+                                  {/* Download Button */}
+                                  <a 
+                                    href={course.fileUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 shadow-sm transition-colors duration-200"
+                                  >
+                                    <IoCloudDownload className="h-3.5 w-3.5 mr-1.5" />
+                                    Download
+                                  </a>
+                                  
+                                  {/* Generate Audio Button */}
+                                  {(!course.audioId && !course.audioUrl) && (course.summarized || course.description) && (
+                                    <button
+                                      onClick={() => generateAudio(course)}
+                                      disabled={isGeneratingAudio}
+                                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {generatingAudioForCourse === course._id ? (
+                                        <>
+                                          <svg className="animate-spin h-3.5 w-3.5 mr-1.5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Generating...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <IoVolumeHigh className="h-3.5 w-3.5 mr-1.5" />
+                                          Generate Audio
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                  
+                                  {/* Summarize Button */}
+                                  {!course.summarized && (
+                                    <button
+                                      onClick={() => generateSummary(course._id, course.fileUrl, course.fileType)}
+                                      disabled={summarizingCourseId === course._id}
+                                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full bg-white text-green-600 border border-green-200 hover:bg-green-50 shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {summarizingCourseId === course._id ? (
+                                        <>
+                                          <svg className="animate-spin h-3.5 w-3.5 mr-1.5 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Summarizing...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <IoSparkles className="h-3.5 w-3.5 mr-1.5" />
+                                          Summarize
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
-          <div className="flex-1 overflow-auto p-6">
-            <div className="prose prose-blue max-w-none">
-              {viewingSummary.summary.split('\n').map((line, i) => (
-                line.startsWith('##') ? (
-                  <h2 key={i} className="text-xl font-bold mt-6 mb-3">{line.replace('##', '').trim()}</h2>
-                ) : line.startsWith('•') ? (
-                  <div key={i} className="flex items-start mb-2">
-                    <span className="text-blue-500 mr-2">•</span>
-                    <p className="margin-0">{line.substring(1).trim()}</p>
+          {/* Fix modal content scrolling */}
+          {viewingSummary && (
+            <div className="fixed inset-0 z-50 overflow-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+              <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                {/* Backdrop */}
+                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+                
+                {/* Modal panel */}
+                <div className="inline-block align-bottom bg-white rounded-2xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                  {/* Modal header and close button remain the same */}
+                  <div className="absolute top-0 right-0 pt-4 pr-4">
+                    <button
+                      type="button"
+                      onClick={closeSummaryViewer}
+                      className="bg-white rounded-full p-1.5 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <span className="sr-only">Close</span>
+                      <IoClose className="h-6 w-6" />
+                    </button>
                   </div>
-                ) : (
-                  <p key={i} className={line.trim() === '' ? 'my-4' : 'my-2'}>{line}</p>
-                )
-              ))}
+                  
+                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 sm:px-8">
+                    <h3 className="text-lg sm:text-xl font-bold text-white flex items-center">
+                      <IoSparkles className="h-5 w-5 mr-2 text-indigo-200" />
+                      AI Summary: {viewingSummary.name}
+                    </h3>
+                  </div>
+                  
+                  <div className="flex border-b border-gray-200">
+                    <div className="px-6 py-3 sm:px-8">
+                      <button
+                        onClick={() => {
+                          closeSummaryViewer();
+                          viewCourse(viewingSummary);
+                        }}
+                        className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center"
+                      >
+                        <IoDocument className="h-4 w-4 mr-1.5" />
+                        View Original Document
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Improved scrollable content area */}
+                  <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+                    <div className="px-6 py-6 sm:px-8 sm:py-8">
+                      <article className="prose prose-indigo max-w-none">
+                        {viewingSummary.summary.split('\n').map((line, i) => (
+                          line.startsWith('##') ? (
+                            <h2 key={i} className="text-xl sm:text-2xl font-bold mt-6 mb-3 pb-2 text-gray-800 border-b border-gray-200">
+                              {line.replace('##', '').trim()}
+                            </h2>
+                          ) : line.startsWith('•') ? (
+                            <div key={i} className="flex items-start mb-2 pl-2">
+                              <span className="text-indigo-500 mr-2 font-bold">•</span>
+                              <p className="my-0 text-gray-700">{line.substring(1).trim()}</p>
+                            </div>
+                          ) : (
+                            <p key={i} className={`${line.trim() === '' ? 'my-4' : 'my-2'} text-gray-700`}>{line}</p>
+                          )
+                        ))}
+                      </article>
+                      
+                      <div className="mt-8 pt-6 border-t border-gray-200 bg-gray-50 rounded-xl p-4">
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-2 text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <IoCalendar className="h-4 w-4 mr-2 text-indigo-500" />
+                            <span>Generated on: {viewingSummary.summaryDate ? new Date(viewingSummary.summaryDate).toLocaleString() : 'Unknown'}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <IoSparkles className="h-4 w-4 mr-2 text-indigo-500" />
+                            <span>Summary type: {viewingSummary.summaryType === 'ai' ? 'AI-powered' : 'Text extraction'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            
-            <div className="mt-8 pt-6 border-t text-sm text-gray-500">
-              <p>Generated on: {viewingSummary.summaryDate ? new Date(viewingSummary.summaryDate).toLocaleString() : 'Unknown'}</p>
-              <p>Summary type: {viewingSummary.summaryType === 'ai' ? 'AI-powered' : 'Text extraction'}</p>
-            </div>
-          </div>
+          )}
+          
+          {/* Similar changes for your other modal (viewingCourse) */}
         </div>
       </div>
-    )}
     </div>
   );
 }
