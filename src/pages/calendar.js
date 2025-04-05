@@ -189,27 +189,88 @@ function Meeting({ meeting }) {
 
 function CalendarLegend({ teachers }) {
   return (
-    <div className="mt-6 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-      <h3 className="text-sm font-medium text-gray-700 mb-2">Event Creator Legend</h3>
-      <div className="space-y-2">
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
-          <span className="text-sm text-gray-600">Student</span>
+    <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+      <h3 className="text-md font-semibold text-gray-800 mb-3">Event Creator Legend</h3>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {/* Student entry */}
+        <div className="flex items-center p-2 rounded-md hover:bg-gray-50">
+          <div className="w-4 h-4 bg-gray-400 rounded-full mr-3"></div>
+          <div>
+            <p className="text-sm font-medium text-gray-700">Students</p>
+            <p className="text-xs text-gray-500">All student-created events</p>
+          </div>
         </div>
         
+        {/* Teacher entries */}
         {teachers && teachers.length > 0 ? (
           teachers.map((teacher, index) => (
-            <div key={index} className="flex items-center">
-              <div className={`w-3 h-3 ${getUserColor(teacher.email, true)} rounded-full mr-2`}></div>
-              <span className="text-sm text-gray-600">
-                {teacher.name || teacher.email.split('@')[0]}
-              </span>
+            <div key={teacher.id || index} className="flex items-center p-2 rounded-md hover:bg-gray-50">
+              <div 
+                className={`w-4 h-4 ${getUserColor(teacher.email, true)} rounded-full mr-3`}
+              ></div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">{teacher.name}</p>
+                <p className="text-xs text-gray-500 truncate" title={teacher.email}>
+                  {teacher.email}
+                </p>
+              </div>
             </div>
           ))
         ) : (
-          <div className="text-sm text-gray-500">No teachers found</div>
+          <div className="flex items-center p-2">
+            <p className="text-sm text-gray-500 italic">No teachers found</p>
+          </div>
         )}
       </div>
+      
+      {/* Help text */}
+      <div className="mt-3 pt-3 border-t border-gray-100">
+        <p className="text-xs text-gray-500">
+          Event colors indicate who created the event. Students' events are shown in gray, 
+          while teachers have unique colors to easily identify their events.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AdminPanel() {
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+          setIsAdmin(true);
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [user]);
+
+  if (!user || !isAdmin) {
+    return (
+      <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+        <h3 className="text-md font-semibold text-gray-800 mb-3">Admin Authentication</h3>
+        {!isAdmin && (
+          <p className="text-red-500 mb-4">You need admin privileges to access this panel.</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+      <h3 className="text-md font-semibold text-gray-800 mb-3">Admin Panel</h3>
+      <p>Welcome, Admin!</p>
     </div>
   );
 }
@@ -223,6 +284,7 @@ export default function CalendarPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [teachers, setTeachers] = useState([]);
+    const [isUserTeacher, setIsUserTeacher] = useState(false);
   
     const [eventTitle, setEventTitle] = useState('');
     const [eventDescription, setEventDescription] = useState('');
@@ -232,23 +294,29 @@ export default function CalendarPage() {
     const [teacherPassword, setTeacherPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
   
+    const checkTeacherStatus = async () => {
+      if (!user) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().role === 'teacher') {
+          setIsUserTeacher(true);
+        } else {
+          setIsUserTeacher(false);
+        }
+      } catch (error) {
+        console.error('Error checking teacher status:', error);
+        setIsUserTeacher(false);
+      }
+    };
+
     const createEvent = async (e) => {
       e.preventDefault();
       setLoading(true);
       
-      // Check teacher password if teacher mode is selected
-      if (isTeacherMode) {
-        // For testing, password is 1234
-        if (teacherPassword !== '1234') {
-          setPasswordError('Invalid teacher password');
-          setLoading(false);
-          return;
-        }
-      }
-      
       try {
-        // Set role based on teacher mode
-        let userRole = isTeacherMode ? 'teacher' : 'student';
+        // Determine if this is a teacher event
+        let userRole = isUserTeacher ? 'teacher' : 'student';
 
         const eventRef = await addDoc(collection(db, 'events'), {
           title: eventTitle,
@@ -264,7 +332,7 @@ export default function CalendarPage() {
           creatorRole: userRole, // Use the determined role
           createdAt: serverTimestamp()
         });
-    
+        
         const usersQuery = query(collection(db, 'users'));
         const usersSnapshot = await getDocs(usersQuery);
         
@@ -405,6 +473,7 @@ export default function CalendarPage() {
       if (user) {
         fetchEvents();
         fetchTeachers();
+        checkTeacherStatus();
       }
     }, [user]);
   
@@ -413,7 +482,7 @@ export default function CalendarPage() {
       setEventDescription('');
       setEventTime('');
       setMaxParticipants(1);
-      setIsTeacherMode(false);
+      setIsTeacherMode(isUserTeacher);
       setTeacherPassword('');
       setPasswordError('');
     };
@@ -478,13 +547,20 @@ export default function CalendarPage() {
       }
     };
     
-    useEffect(() => {
-      if (user) {
-        fetchNotifications();
-        const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
+   
+
+    const makeUserTeacher = async (userId) => {
+      try {
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+          role: 'teacher'
+        });
+        alert('User is now a teacher');
+      } catch (error) {
+        console.error('Error updating user role:', error);
       }
-    }, [user]);
+    };
+
 
     let today = startOfToday()
     let [selectedDay, setSelectedDay] = useState(today)
@@ -505,6 +581,14 @@ export default function CalendarPage() {
       let firstDayNextMonth = add(firstDayCurrentMonth, { months: 1 })
       setCurrentMonth(format(firstDayNextMonth, 'MMM-yyyy'))
     }
+    
+    // Add this before the CalendarLegend in your return statement
+    // Only for development/testing
+    const dummyTeachers = [
+      { id: 'dummy1', email: 'teacher1@example.com', name: 'Teacher One' },
+      { id: 'dummy2', email: 'teacher2@example.com', name: 'Teacher Two' },
+      { id: 'dummy3', email: 'teacher3@example.com', name: 'Teacher Three' }
+    ];
     
 return (
   <AuthGuard>
@@ -537,6 +621,7 @@ return (
                     <h3 className="text-lg font-semibold mb-4">Create New Event</h3>
                     <form onSubmit={createEvent}>
                       <div className="space-y-4">
+                        {/* Regular form fields remain the same */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Title</label>
                           <input
@@ -592,49 +677,21 @@ return (
                           />
                         </div>
                         
-                        {/* Add teacher mode checkbox */}
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id="isTeacher"
-                            checked={isTeacherMode}
-                            onChange={(e) => {
-                              setIsTeacherMode(e.target.checked);
-                              if (!e.target.checked) {
-                                setPasswordError('');
-                                setTeacherPassword('');
-                              }
-                            }}
-                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                          />
-                          <label htmlFor="isTeacher" className="ml-2 block text-sm text-gray-700">
-                            I'm creating this event as a teacher
-                          </label>
-                        </div>
-                        
-                        {/* Show password field only if teacher mode is selected */}
-                        {isTeacherMode && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Teacher Password</label>
-                            <input
-                              type="password"
-                              value={teacherPassword}
-                              onChange={(e) => {
-                                setTeacherPassword(e.target.value);
-                                setPasswordError('');
-                              }}
-                              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-purple-500 ${
-                                passwordError ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
-                              }`}
-                              placeholder="Enter teacher password"
-                              required={isTeacherMode}
-                            />
-                            {passwordError && (
-                              <p className="mt-1 text-sm text-red-600">{passwordError}</p>
-                            )}
-                            <p className="mt-1 text-xs text-gray-500">
-                              Teacher events will be color-coded differently on the calendar.
-                            </p>
+                        {/* Show teacher info message instead of checkbox/password */}
+                        {isUserTeacher && (
+                          <div className="rounded-md bg-blue-50 p-3">
+                            <div className="flex">
+                              <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="ml-3 flex-1 md:flex md:justify-between">
+                                <p className="text-sm text-blue-700">
+                                  You are creating this event as a teacher. Your events will be color-coded accordingly.
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -854,11 +911,11 @@ return (
               </ol>
             </section>
           </div>
-          <CalendarLegend teachers={teachers} />
+          <CalendarLegend teachers={teachers.length > 0 ? teachers : dummyTeachers} />
         </div>
       </main>
     </div>
-   
+    <AdminPanel />
   </AuthGuard>
 )
 }
