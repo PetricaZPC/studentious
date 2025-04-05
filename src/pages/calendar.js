@@ -3,8 +3,6 @@ import { Fragment, useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import Image from 'next/image'
-import Header from '@/components/Header'
-import Footer from '@/components/Footer'
 import { useRouter } from 'next/router'
 import { useAuth } from './api/context/AuthContext'
 import { db } from './api/config/firebaseConfig'
@@ -35,6 +33,7 @@ import {
   startOfToday,
 } from 'date-fns'
 import AuthGuard from './api/AuthGuard';
+import Sidebar from '@/components/layout/Sidebar'
 
 const Menu = dynamic(
   () => import('@headlessui/react').then(mod => mod.Menu),
@@ -267,20 +266,20 @@ function classNames(...classes) {
     
 return (
   <AuthGuard>
-  <Header />
+  <Sidebar />
     <Head>
       <title>Calendar | Studentious</title>
       <meta name="description" content="Schedule and manage your meetings" />
     </Head>
 
-    <div className="min-h-screen bg-gray-100">
+    <div className=" min-h-screen bg-gray-100">
       <main className="pt-16">
         <div className="max-w-md px-4 mx-auto sm:px-7 md:max-w-4xl md:px-6">
           <div className="md:grid md:grid-cols-2 md:divide-x md:divide-gray-200">
             <div className="md:pr-14">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="flex-auto font-semibold text-gray-900">
-                  {format(firstDayCurrentMonth, 'MMMM yyyy')}
+                 
                 </h2>
                 <button
                   onClick={() => setShowEventModal(true)}
@@ -490,7 +489,7 @@ return (
         </div>
       </main>
     </div>
-    <Footer />
+   
   </AuthGuard>
 )
 }
