@@ -37,11 +37,9 @@ export default async function handler(req, res) {
           hash |= 0;
         }
         
-        // Add the current timestamp's last 4 digits to ensure uniqueness between calls
-        const timeComponent = Date.now() % 10000;
-        
-        // Important: Make sure this is a positive 7-digit number by taking modulo and adding offset
-        return ((Math.abs(hash) % 9000000) + 1000000) ^ timeComponent;
+        // Remove XOR with timestamp to create more consistent IDs
+        // Just ensure it's in valid range (positive 7-digit number)
+        return (Math.abs(hash) % 9000000) + 1000000;
       } else {
         // Add current timestamp to avoid collisions between different users
         return Math.floor(1000000 + Math.random() * 9000000);

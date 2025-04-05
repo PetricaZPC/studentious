@@ -272,7 +272,14 @@ export default function VideoComponent({ roomId, onLeave }) {
             encoderConfig: {
               sampleRate: 48000,
               stereo: false,
-              bitrate: 128 // Increase from default to fix the SEND_AUDIO_BITRATE_TOO_LOW warning
+              bitrate: 128 // Fixed bitrate to address warning
+            },
+            // Add these to fix audio context freezing
+            audioOptimizationMode: "balanced",
+            audioProcessing: {
+              acousticEchoCancellation: true,
+              automaticGainControl: true,
+              noiseSuppression: true
             }
           }, 
           {
@@ -280,6 +287,15 @@ export default function VideoComponent({ roomId, onLeave }) {
             facingMode: 'user'
           }
         );
+
+        // Reset AudioContext when it gets stuck by toggling audio
+        setInterval(() => {
+          if (localAudioTrack && !isAudioMuted) {
+            // Brief mute/unmute to reset AudioContext
+            localAudioTrack.setMuted(true);
+            setTimeout(() => localAudioTrack.setMuted(false), 50);
+          }
+        }, 60000); // Check every minute
 
         // Make sure the audio is unmuted when first joining
         await audioTrack.setMuted(false);
