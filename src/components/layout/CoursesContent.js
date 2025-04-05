@@ -1,11 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/pages/api/context/AuthContext';
-import { db, storage } from '@/pages/api/config/firebaseConfig';
-import { 
-  collection, addDoc, getDocs, query, 
-  orderBy, serverTimestamp, doc, updateDoc 
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function CoursesContent() {
   const { user } = useAuth();
@@ -18,6 +12,8 @@ export default function CoursesContent() {
   const [success, setSuccess] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [viewingCourse, setViewingCourse] = useState(null);
+  const [summarizingCourseId, setSummarizingCourseId] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -28,15 +24,17 @@ export default function CoursesContent() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const q = query(collection(db, 'courses'), orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      
-      const courseList = [];
-      querySnapshot.forEach((doc) => {
-        courseList.push({ id: doc.id, ...doc.data() });
+      const response = await fetch('/api/courses/list', {
+        method: 'GET',
+        credentials: 'include'
       });
       
-      setCourses(courseList);
+      if (!response.ok) {
+        throw new Error('Failed to fetch courses');
+      }
+      
+      const data = await response.json();
+      setCourses(data.courses);
     } catch (err) {
       console.error('Error fetching courses:', err);
     } finally {
@@ -85,39 +83,36 @@ export default function CoursesContent() {
       setSuccess('');
       setIsUploading(true);
       
-      // 1. Upload file to Firebase Storage
-      const fileRef = ref(storage, `courses/${Date.now()}-${file.name}`);
-      await uploadBytes(fileRef, file);
+      // 1. Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('name', courseName);
+      formData.append('description', courseDescription);
       
-      // 2. Get download URL
-      const fileUrl = await getDownloadURL(fileRef);
+      // 2. Upload file and course data to MongoDB via API
+      const response = await fetch('/api/courses/create', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
       
-      // 3. Store course info in Firestore
-      const courseData = {
-        name: courseName,
-        description: courseDescription,
-        fileUrl,
-        fileName: file.name,
-        fileType: file.name.split('.').pop().toLowerCase(),
-        uploadedBy: user.uid,
-        uploaderName: user.displayName || user.email,
-        createdAt: serverTimestamp(),
-        summarized: false,
-        summary: ''
-      };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload course');
+      }
       
-      const docRef = await addDoc(collection(db, 'courses'), courseData);
+      const data = await response.json();
       
       setSuccess('Course uploaded successfully!');
       setCourseName('');
       setCourseDescription('');
       setFile(null);
       
-      // 4. Request summary
+      // 3. Request summary (already handled by backend in this case)
       setIsSummarizing(true);
-      await generateSummary(docRef.id, fileUrl, file.name.split('.').pop().toLowerCase());
+      await generateSummary(data.courseId, data.fileUrl, data.fileType);
       
-      // 5. Refresh course list
+      // 4. Refresh course list
       fetchCourses();
       
     } catch (err) {
@@ -131,8 +126,8 @@ export default function CoursesContent() {
 
   const generateSummary = async (courseId, fileUrl, fileType) => {
     try {
-      // Create a simple proxy URL for our API
-      const response = await fetch('/api/summarize', {
+      setSummarizingCourseId(courseId);
+      const response = await fetch('/api/courses/summarize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -141,28 +136,29 @@ export default function CoursesContent() {
           courseId,
           fileUrl,
           fileType
-        })
+        }),
+        credentials: 'include'
       });
       
       if (!response.ok) {
         throw new Error('Summary generation failed');
       }
       
-      const data = await response.json();
-      
-      // Update the document with the summary
-      await updateDoc(doc(db, 'courses', courseId), {
-        summary: data.summary || 'No summary available',
-        summarized: true
-      });
-      
+      await response.json();
+      fetchCourses(); // Refresh to show the new summary
     } catch (err) {
       console.error('Error generating summary:', err);
-      await updateDoc(doc(db, 'courses', courseId), {
-        summary: 'Failed to generate summary',
-        summarized: true
-      });
+    } finally {
+      setSummarizingCourseId(null);
     }
+  };
+
+  const viewCourse = (course) => {
+    setViewingCourse(course);
+  };
+
+  const closeViewer = () => {
+    setViewingCourse(null);
   };
 
   return (<div className="w-full max-w-6xl mx-auto">
@@ -263,7 +259,7 @@ export default function CoursesContent() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {courses.map(course => (
-                <div key={course.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div key={course._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start">
                     <h3 className="font-semibold text-lg">{course.name}</h3>
                     <span className={`text-xs px-2 py-1 rounded ${course.fileType === 'pdf' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
@@ -284,20 +280,46 @@ export default function CoursesContent() {
                   
                   <div className="mt-4 flex justify-between items-center text-sm">
                     <span className="text-gray-500">
-                      Uploaded: {course.createdAt ? new Date(course.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown date'}
+                      Uploaded: {course.createdAt ? new Date(course.createdAt).toLocaleDateString() : 'Unknown date'}
                     </span>
                     
-                    <a 
-                      href={course.fileUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-blue-500 hover:text-blue-700 flex items-center"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download
-                    </a>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => viewCourse(course)}
+                        className="text-blue-500 hover:text-blue-700 flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                        </svg>
+                        View
+                      </button>
+                      
+                      <a 
+                        href={course.fileUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-500 hover:text-blue-700 flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download
+                      </a>
+                      
+                      {!course.summarized && (
+                        <button
+                          onClick={() => generateSummary(course._id, course.fileUrl, course.fileType)}
+                          disabled={summarizingCourseId === course._id}
+                          className="text-green-500 hover:text-green-700 flex items-center disabled:opacity-50"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm11 1H6v8l4-2 4 2V6z" clipRule="evenodd" />
+                          </svg>
+                          {summarizingCourseId === course._id ? 'Summarizing...' : 'Summarize'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -306,6 +328,53 @@ export default function CoursesContent() {
         </div>
       </div>
     </div>
+    
+    {/* Document Viewer Modal */}
+    {viewingCourse && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg w-full max-w-4xl h-5/6 flex flex-col">
+          <div className="flex justify-between items-center p-4 border-b">
+            <h3 className="text-lg font-semibold">{viewingCourse.name}</h3>
+            <button onClick={closeViewer} className="text-gray-500 hover:text-gray-700">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-auto p-4">
+            {viewingCourse.fileType === 'pdf' ? (
+              <iframe 
+                src={viewingCourse.fileUrl} 
+                className="w-full h-full border-none" 
+                title={viewingCourse.name}
+              ></iframe>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <p className="mb-4 text-gray-600">Word documents can't be previewed directly.</p>
+                  <a 
+                    href={viewingCourse.fileUrl} 
+                    target="_blank"
+                    rel="noopener noreferrer" 
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    Download to View
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {viewingCourse.summarized && (
+            <div className="p-4 border-t">
+              <h4 className="font-medium mb-2">AI Summary</h4>
+              <p className="text-gray-700">{viewingCourse.summary}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
     </div>
   );
 }
