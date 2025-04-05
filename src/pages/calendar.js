@@ -737,8 +737,9 @@ return (
                     const isTeacher = event.creatorRole === 'teacher';
                     const userColor = getUserColor(event.creatorEmail || 'unknown@email.com', isTeacher);
                     const isCreator = event.creatorId === user?.id;
-                    const hasJoined = event.participants && event.participants.includes(user?.id);
+                    const hasJoined = event.participants?.includes(user?.id);
                     const isFull = event.currentParticipants >= event.maxParticipants;
+                    const isPastEvent = new Date(event.date) < new Date();
 
                     return (
 
@@ -750,42 +751,87 @@ return (
                         <div className={`w-3 h-3 ${userColor} rounded-full flex-shrink-0`}></div>
                         
                         <div className="flex-auto">
-                          <p className="text-gray-900 font-medium">{event.title}</p>
-                          <p className="mt-0.5">{event.description}</p>
-                          <div className="flex justify-between mt-1">
-                            <p className="text-purple-600">
-                              Time: {event.time} • {event.currentParticipants}/{event.maxParticipants} participants
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Created by: {event.creatorEmail || 'Unknown'}
-                            </p>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-gray-900 font-medium">{event.title}</p>
+                              <p className="mt-0.5 text-gray-600">{event.description}</p>
+                            </div>
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              isPastEvent ? 'bg-gray-100 text-gray-600' :
+                              isFull ? 'bg-red-100 text-red-700' :
+                              'bg-green-100 text-green-700'
+                            }`}>
+                              {isPastEvent ? 'Past Event' :
+                               isFull ? 'Full' : 
+                               `${event.maxParticipants - event.currentParticipants} spots left`}
+                            </span>
+                          </div>
+                          
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                            <span className="flex items-center text-gray-600">
+                              <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {event.time}
+                            </span>
+                            
+                            <span className="flex items-center text-gray-600">
+                              <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              {event.location}
+                            </span>
+                            
+                            <span className="flex items-center text-gray-600">
+                              <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                              Created by {event.creatorEmail || 'Unknown'}
+                            </span>
                           </div>
                         </div>
                         
-                        <div className="flex space-x-2">
-                          {/* Join button - only show if not creator, not joined, and not full */}
-                          {!isCreator && !hasJoined && !isFull && (
-                            <button
-                              onClick={() => joinEvent(event._id)}
-                              className="px-3 py-1 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700"
-                            >
-                              Join
-                            </button>
+                        <div className="flex flex-col space-y-2">
+                          {/* Status indicators */}
+                          {hasJoined && (
+                            <span className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md text-center">
+                              Attending
+                            </span>
                           )}
-                          
-                          {/* Delete button - only show for creator */}
-                          {isCreator && (
-                            <button
-                              onClick={() => {
-                                if (window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-                                  deleteEvent(event._id);
-                                }
-                              }}
-                              className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600"
-                            >
-                              Delete
-                            </button>
-                          )}
+
+                          {/* Action buttons */}
+                          <div className="flex space-x-2">
+                            {/* Creator actions */}
+                            {isCreator && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('Are you sure you want to delete this event? This cannot be undone.')) {
+                                    deleteEvent(event._id);
+                                  }
+                                }}
+                                className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                                disabled={isPastEvent}
+                              >
+                                Delete Event
+                              </button>
+                            )}
+
+                            {/* Non-creator actions */}
+                            {!isCreator && !hasJoined && !isPastEvent && (
+                              <button
+                                onClick={() => joinEvent(event._id)}
+                                className="px-3 py-1 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                                disabled={isFull}
+                              >
+                                {isFull ? 'Event Full' : 'Join Event'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </li>
                       </a>
