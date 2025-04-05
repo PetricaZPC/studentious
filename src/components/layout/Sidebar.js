@@ -45,8 +45,8 @@ export default function Sidebar() {
     <nav className="w-64 fixed left-0 top-0 h-full bg-white p-6 border-r border-gray-200 shadow-sm flex flex-col">
       {/* Logo with text */}
       <div className="flex items-center justify-center mb-8">
-        <div className="h-10 w-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-          <span className="text-white font-bold text-lg">S</span>
+        <div className="h-10 w-10 flex items-center justify-center mr-3">
+          <img src="/favicon.ico" alt="Logo" className="h-8 w-8" />
         </div>
         <span className="text-xl font-semibold text-gray-800">Studentious</span>
       </div>
