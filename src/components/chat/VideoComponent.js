@@ -100,17 +100,28 @@ export default function VideoComponent({ roomId, onLeave }) {
           }
           
           if (mediaType === 'audio') {
+            console.log(`Processing audio track for remote user ${user.uid}`);
+            
             setRemoteUsers(prev => ({
               ...prev,
               [user.uid]: { 
                 ...prev[user.uid], 
                 audioTrack: user.audioTrack, 
-                name: userName 
+                name: userName,
+                hasAudio: true
               }
             }));
             
-            if (user.audioTrack) {
-              user.audioTrack.play();
+            // Important: Make sure audio is played properly
+            try {
+              if (user.audioTrack) {
+                console.log(`Playing audio for user ${user.uid}`);
+                // Make sure volume is set high enough
+                user.audioTrack.setVolume(100);
+                user.audioTrack.play();
+              }
+            } catch (audioPlayError) {
+              console.error(`Error playing audio for user ${user.uid}:`, audioPlayError);
             }
           }
           
@@ -263,73 +274,79 @@ export default function VideoComponent({ roomId, onLeave }) {
           console.warn('Failed to set user attributes:', err);
         }
 
-        // Create and publish tracks with enhanced options
-        const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
-          {
-            AEC: true, // Echo cancellation
-            ANS: true, // Auto noise suppression
-            AGC: true, // Auto gain control
-            encoderConfig: {
-              sampleRate: 48000,
-              stereo: false,
-              bitrate: 128 // Fixed bitrate to address warning
-            },
-            // Add these to fix audio context freezing
-            audioOptimizationMode: "balanced",
-            audioProcessing: {
-              acousticEchoCancellation: true,
-              automaticGainControl: true,
-              noiseSuppression: true
-            }
-          }, 
-          {
+        // Update the audio track creation and handling sections
+
+        // Replace the current audio track creation with this more robust approach:
+        try {
+          // Create audio track separately with simpler settings
+          console.log('Creating audio track with simplified settings...');
+          const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+            encoderConfig: 'music_standard',  // Use music_standard for better quality
+            AEC: true, 
+            ANS: true,
+            AGC: true
+          });
+          
+          // Create video track separately
+          console.log('Creating video track...');
+          const videoTrack = await AgoraRTC.createCameraVideoTrack({
             encoderConfig: 'standard',
             facingMode: 'user'
+          });
+          
+          // Set audio track for local use (but don't play it to avoid echo)
+          setLocalAudioTrack(audioTrack);
+          setLocalVideoTrack(videoTrack);
+          
+          // Play local video
+          if (localVideoRef.current) {
+            videoTrack.play(localVideoRef.current);
           }
-        );
-
-        // Reset AudioContext when it gets stuck by toggling audio
-        setInterval(() => {
-          if (localAudioTrack && !isAudioMuted) {
-            // Brief mute/unmute to reset AudioContext
-            localAudioTrack.setMuted(true);
-            setTimeout(() => localAudioTrack.setMuted(false), 50);
-          }
-        }, 60000); // Check every minute
-
-        // Make sure the audio is unmuted when first joining
-        await audioTrack.setMuted(false);
-        await videoTrack.setMuted(false);
-
-        // Prevent echo by setting local audio volume to 0
-        audioTrack.setVolume(0);
-
-        // Log before publishing to help with debugging
-        console.log('Publishing local tracks to channel...');
-
-        // Publish tracks with explicit error handling
-        try {
-          await agoraClient.current.publish([audioTrack, videoTrack]);
-          console.log('Successfully published local tracks');
-        } catch (publishError) {
-          console.error('Failed to publish tracks:', publishError);
-          // Try publishing just audio if video fails
-          if (publishError.message.includes('video')) {
-            try {
-              await agoraClient.current.publish([audioTrack]);
-              console.log('Published audio-only as fallback');
-            } catch (audioError) {
-              console.error('Failed to publish audio as fallback:', audioError);
+          
+          // Explicitly ensure tracks are unmuted before publishing
+          await audioTrack.setMuted(false);
+          await videoTrack.setMuted(false);
+          
+          // Publish audio track first, then video track separately
+          console.log('Publishing audio track...');
+          try {
+            await agoraClient.current.publish(audioTrack);
+            console.log('Audio track published successfully');
+            
+            console.log('Publishing video track...');
+            await agoraClient.current.publish(videoTrack);
+            console.log('Video track published successfully');
+          } catch (publishError) {
+            console.error('Failed to publish tracks:', publishError);
+            
+            // Try republishing just audio if initial publish fails
+            if (!publishError.message.includes('already-published')) {
+              try {
+                await agoraClient.current.unpublish();
+                await agoraClient.current.publish(audioTrack);
+                console.log('Audio track republished after error');
+              } catch (audioError) {
+                console.error('Failed to republish audio:', audioError);
+              }
             }
           }
-        }
+          
+          // Add a debug log for audio levels
+          setInterval(() => {
+            if (audioTrack && !isAudioMuted) {
+              const audioLevel = audioTrack.getVolumeLevel();
+              console.log(`Local audio level: ${audioLevel}`);
+              // If audio level is consistently 0, there might be a mic issue
+              if (audioLevel === 0) {
+                console.warn("Audio level is 0 - microphone might not be working");
+              }
+            }
+          }, 5000);
 
-        setLocalAudioTrack(audioTrack);
-        setLocalVideoTrack(videoTrack);
-        
-        // Play local video
-        if (localVideoRef.current) {
-          videoTrack.play(localVideoRef.current);
+        } catch (err) {
+          console.error('Error creating media tracks:', err);
+          setError(`Could not access your camera or microphone: ${err.message}`);
+          setLoading(false);
         }
 
         setLoading(false);
@@ -364,8 +381,22 @@ export default function VideoComponent({ roomId, onLeave }) {
           {/* Controls */}
           <button
             onClick={() => {
-              localAudioTrack?.setEnabled(!isAudioMuted);
-              setIsAudioMuted(!isAudioMuted);
+              if (localAudioTrack) {
+                const newMutedState = !isAudioMuted;
+                console.log(`Setting audio muted state to: ${newMutedState}`);
+                
+                // Use the proper method to mute/unmute
+                localAudioTrack.setEnabled(!newMutedState);
+                
+                // Also try the setMuted method as fallback
+                localAudioTrack.setMuted(newMutedState);
+                
+                // Log the state after changing
+                console.log(`After toggle - track enabled: ${localAudioTrack.enabled}, muted: ${localAudioTrack.muted}`);
+                
+                // Update state
+                setIsAudioMuted(newMutedState);
+              }
             }}
             className={`p-2 rounded-full ${isAudioMuted ? 'bg-red-500' : 'bg-gray-600'}`}
           >
@@ -422,8 +453,22 @@ export default function VideoComponent({ roomId, onLeave }) {
         {Object.entries(remoteUsers).map(([uid, user]) => (
           <div key={uid} className="relative bg-black rounded-lg overflow-hidden aspect-video">
             <div id={`remote-video-${uid}`} className="absolute inset-0"></div>
-            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded">
+            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded flex items-center">
               {user.name || `User ${uid}`}
+              
+              {/* Audio indicator */}
+              <span className="ml-2">
+                {user.hasAudio ? (
+                  <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                  </svg>
+                )}
+              </span>
             </div>
           </div>
         ))}
