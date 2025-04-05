@@ -461,7 +461,7 @@ return (
               <ol className="mt-4 space-y-1 text-sm leading-6 text-gray-500">
                 {events.filter(event => isSameDay(parseISO(event.date), selectedDay)).length > 0 ? (
                   events
-                    .filter(event => isSameDay(parseISO(event.date), selectedDay))
+                    .filter(event => isSameDay(parseISO(event.date), selectedDay) && event.currentParticipants < event.maxParticipants)
                     .map((event) => (
                       <li key={event.id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
                         <div className="flex-auto">
