@@ -10,7 +10,7 @@ export default function Home() {
       <Layout>
       <Sidebar />
       <MainContent />
-      <RightPanel />
+  
     </Layout>
     </AuthGuard>
     
