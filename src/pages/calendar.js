@@ -235,46 +235,6 @@ function CalendarLegend({ teachers }) {
   );
 }
 
-function AdminPanel() {
-  const { user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) return;
-      
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
-          setIsAdmin(true);
-        }
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-      }
-    };
-    
-    checkAdminStatus();
-  }, [user]);
-
-  if (!user || !isAdmin) {
-    return (
-      <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-        <h3 className="text-md font-semibold text-gray-800 mb-3">Admin Authentication</h3>
-        {!isAdmin && (
-          <p className="text-red-500 mb-4">You need admin privileges to access this panel.</p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-      <h3 className="text-md font-semibold text-gray-800 mb-3">Admin Panel</h3>
-      <p>Welcome, Admin!</p>
-    </div>
-  );
-}
-
 export default function CalendarPage() {
     const { user } = useAuth();
     const router = useRouter();
@@ -582,23 +542,18 @@ export default function CalendarPage() {
       setCurrentMonth(format(firstDayNextMonth, 'MMM-yyyy'))
     }
     
-    // Add this before the CalendarLegend in your return statement
-    // Only for development/testing
-    const dummyTeachers = [
-      { id: 'dummy1', email: 'teacher1@example.com', name: 'Teacher One' },
-      { id: 'dummy2', email: 'teacher2@example.com', name: 'Teacher Two' },
-      { id: 'dummy3', email: 'teacher3@example.com', name: 'Teacher Three' }
-    ];
+ 
+
     
 return (
   <AuthGuard>
-  <Sidebar />
+    <Sidebar />
     <Head>
       <title>Calendar | Studentious</title>
       <meta name="description" content="Schedule and manage your meetings" />
     </Head>
 
-    <div className=" min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100">
       <main className="pt-16">
         <div className="max-w-md px-4 mx-auto sm:px-7 md:max-w-4xl md:px-6">
           <div className="md:grid md:grid-cols-2 md:divide-x md:divide-gray-200">
@@ -911,11 +866,11 @@ return (
               </ol>
             </section>
           </div>
-          <CalendarLegend teachers={teachers.length > 0 ? teachers : dummyTeachers} />
+          
+          <CalendarLegend teachers={teachers} />
         </div>
       </main>
     </div>
-    <AdminPanel />
   </AuthGuard>
 )
 }
