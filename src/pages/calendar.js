@@ -298,19 +298,22 @@ export default function CalendarPage() {
   
     const joinEvent = async (eventId) => {
       try {
+        console.log("Joining event with ID:", eventId); // Debugging: Log the event ID
         const response = await fetch(`/api/events/join/${eventId}`, {
           method: 'POST',
-          credentials: 'include'
+          credentials: 'include', // Ensure cookies are sent with the request
         });
-        
+    
         if (!response.ok) {
-          throw new Error('Failed to join event');
+          const errorData = await response.json(); // Parse the error message from the backend
+          throw new Error(errorData.message || 'Failed to join event');
         }
-        
-        fetchEvents();
+    
+        console.log("Successfully joined event"); // Debugging: Log success
+        fetchEvents(); // Refresh the events list
       } catch (err) {
         setError('Failed to join event: ' + err.message);
-        console.error(err);
+        console.error("Error in joinEvent:", err); // Debugging: Log the error
       }
     };
 
@@ -744,8 +747,8 @@ return (
                     return (
 
                       <a 
-                        className='block rounded-lg hover:bg-gray-50 transition-colors duration-200'
-                        href={`/events/${event._id}`}
+                        className='block bg-white rounded'
+                        href={hasJoined  && `/events/${event._id}`}
                         >
                       <li key={event._id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
                         <div className={`w-3 h-3 ${userColor} rounded-full flex-shrink-0`}></div>
