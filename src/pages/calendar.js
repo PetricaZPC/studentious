@@ -5,21 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/router'
 import { useAuth } from './api/context/AuthContext'
-import { db } from './api/config/firebaseConfig'
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  getDocs, 
-  getDoc, 
-  serverTimestamp, 
-  updateDoc, 
-  arrayUnion,
-  doc,
-  increment,
-  deleteDoc
-} from 'firebase/firestore'
 import {
   add,
   eachDayOfInterval,
@@ -108,7 +93,7 @@ function Meeting({ meeting }) {
       
       <div className="relative w-10 h-10">
         <Image
-          src={meeting.imageUrl}
+          src={meeting.imageUrl || '/default-avatar.png'}
           alt={`${meeting.name}'s avatar`}
           fill
           className="rounded-full object-cover"
@@ -205,12 +190,12 @@ function CalendarLegend({ teachers }) {
         {/* Teacher entries */}
         {teachers && teachers.length > 0 ? (
           teachers.map((teacher, index) => (
-            <div key={teacher.id || index} className="flex items-center p-2 rounded-md hover:bg-gray-50">
+            <div key={teacher._id || index} className="flex items-center p-2 rounded-md hover:bg-gray-50">
               <div 
                 className={`w-4 h-4 ${getUserColor(teacher.email, true)} rounded-full mr-3`}
               ></div>
               <div>
-                <p className="text-sm font-medium text-gray-700">{teacher.name}</p>
+                <p className="text-sm font-medium text-gray-700">{teacher.fullName || teacher.email}</p>
                 <p className="text-xs text-gray-500 truncate" title={teacher.email}>
                   {teacher.email}
                 </p>
@@ -249,23 +234,23 @@ export default function CalendarPage() {
     const [eventTitle, setEventTitle] = useState('');
     const [eventLocation, setEventLocation] = useState('');
     const [eventStartTime, setEventStartTime] = useState('');
-    
+    const [eventEndTime, setEventEndTime] = useState('');
     const [eventDescription, setEventDescription] = useState('');
     const [eventTime, setEventTime] = useState('');
     const [maxParticipants, setMaxParticipants] = useState(1);
-    const [isTeacherMode, setIsTeacherMode] = useState(false);
-    const [teacherPassword, setTeacherPassword] = useState('');
-    const [passwordError, setPasswordError] = useState('');
   
     const checkTeacherStatus = async () => {
       if (!user) return;
       
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'teacher') {
-          setIsUserTeacher(true);
-        } else {
-          setIsUserTeacher(false);
+        const response = await fetch('/api/users/check-teacher', {
+          method: 'GET',
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsUserTeacher(data.isTeacher);
         }
       } catch (error) {
         console.error('Error checking teacher status:', error);
@@ -278,58 +263,33 @@ export default function CalendarPage() {
       setLoading(true);
       
       try {
-        // Determine if this is a teacher event
-        let userRole = isUserTeacher ? 'teacher' : 'student';
-
-        const eventRef = await addDoc(collection(db, 'events'), {
-          title: eventTitle,
-          description: eventDescription,
-          date: format(selectedDate, 'yyyy-MM-dd'),
-          time: eventTime,
-          maxParticipants: maxParticipants,
-          currentParticipants: 1,
-          participants: [user.uid],
-          creatorId: user.uid,
-          creatorName: user.displayName || 'Anonymous',
-          creatorEmail: user.email || 'unknown@email.com',
-          creatorRole: userRole, // Use the determined role
-          createdAt: serverTimestamp(),
-          startTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
-          endTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
+        const response = await fetch('/api/events/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: eventTitle,
+            description: eventDescription,
+            date: format(selectedDate, 'yyyy-MM-dd'),
+            time: eventTime,
+            location: eventLocation,
+            maxParticipants: maxParticipants,
+            startTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
+            endTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventEndTime,
+          }),
+          credentials: 'include'
         });
         
-        const usersQuery = query(collection(db, 'users'));
-        const usersSnapshot = await getDocs(usersQuery);
+        if (!response.ok) {
+          throw new Error('Failed to create event');
+        }
         
-        const notificationPromises = usersSnapshot.docs
-          .filter(doc => doc.id !== user.uid)
-          .map(doc => {
-            return addDoc(collection(db, 'notifications'), {
-              userId: doc.id,
-              eventId: eventRef.id,
-              type: 'newEvent',
-              title: `New Event: ${eventTitle}`,
-              message: `${user.displayName || 'Someone'} created a new event: ${eventTitle}`,
-              creatorName: user.displayName || 'Anonymous',
-              eventDetails: {
-                title: eventTitle,
-                description: eventDescription,
-                date: format(selectedDate, 'yyyy-MM-dd'),
-                time: eventTime,
-                startTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
-                endTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
-              },
-              read: false,
-              createdAt: serverTimestamp()
-            });
-          });
-    
-        await Promise.all(notificationPromises);
         setShowEventModal(false);
         fetchEvents();
         resetForm();
       } catch (err) {
-        setError('Failed to create event');
+        setError('Failed to create event: ' + err.message);
         console.error(err);
       } finally {
         setLoading(false);
@@ -338,101 +298,75 @@ export default function CalendarPage() {
   
     const joinEvent = async (eventId) => {
       try {
-        const eventRef = doc(db, 'events', eventId);
-        await updateDoc(eventRef, {
-          participants: arrayUnion(user.uid),
-          currentParticipants: increment(1)
+        const response = await fetch(`/api/events/join/${eventId}`, {
+          method: 'POST',
+          credentials: 'include'
         });
+        
+        if (!response.ok) {
+          throw new Error('Failed to join event');
+        }
+        
         fetchEvents();
       } catch (err) {
-        setError('Failed to join event');
+        setError('Failed to join event: ' + err.message);
         console.error(err);
       }
     };
 
     const deleteEvent = async (eventId) => {
       try {
-        // Get the event to verify creator
-        const eventRef = doc(db, 'events', eventId);
-        const eventSnap = await getDoc(eventRef);
-        
-        if (!eventSnap.exists()) {
-          setError('Event not found');
-          return;
-        }
-        
-        const eventData = eventSnap.data();
-        
-        // Verify the current user is the creator
-        if (eventData.creatorId !== user.uid) {
-          setError('Only the event creator can delete this event');
-          return;
-        }
-        
-        // Delete the event
-        await deleteDoc(eventRef);
-        
-        // Also delete related notifications
-        const notificationsQuery = query(
-          collection(db, 'notifications'),
-          where('eventId', '==', eventId)
-        );
-        
-        const notificationsSnapshot = await getDocs(notificationsQuery);
-        const deletePromises = notificationsSnapshot.docs.map((doc) => {
-          return deleteDoc(doc.ref);
+        const response = await fetch(`/api/events/delete/${eventId}`, {
+          method: 'DELETE',
+          credentials: 'include'
         });
         
-        await Promise.all(deletePromises);
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.message || 'Failed to delete event');
+        }
         
-        // Refresh the events list
         fetchEvents();
-        
-        // Show success message
         alert('Event deleted successfully');
       } catch (err) {
-        setError('Failed to delete event');
+        setError('Failed to delete event: ' + err.message);
         console.error(err);
       }
     };
   
     const fetchEvents = async () => {
       try {
-        const q = query(collection(db, 'events'));
-        const querySnapshot = await getDocs(q);
-        const eventsList = [];
-        querySnapshot.forEach((doc) => {
-          eventsList.push({ id: doc.id, ...doc.data() });
+        const response = await fetch('/api/events/list', {
+          credentials: 'include'
         });
-        setEvents(eventsList);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch events');
+        }
+        
+        const data = await response.json();
+        setEvents(data.events);
       } catch (err) {
         console.error('Error fetching events:', err);
+        setError('Failed to load events: ' + err.message);
       }
     };
 
     const fetchTeachers = async () => {
       try {
-        const teachersQuery = query(
-          collection(db, 'users'), 
-          where('role', '==', 'teacher')
-        );
-        
-        const snapshot = await getDocs(teachersQuery);
-        const teachersList = [];
-        
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          teachersList.push({
-            id: doc.id,
-            email: data.email,
-            name: data.fullName || data.displayName || data.email
-          });
+        const response = await fetch('/api/users/teachers', {
+          credentials: 'include'
         });
         
-        console.log('Teachers found:', teachersList.length);
-        setTeachers(teachersList);
+        if (!response.ok) {
+          throw new Error('Failed to fetch teachers');
+        }
+        
+        const data = await response.json();
+        setTeachers(data.teachers);
       } catch (error) {
         console.error('Error fetching teachers:', error);
+        setError('Failed to load teachers: ' + error.message);
       }
     };
   
@@ -448,12 +382,10 @@ export default function CalendarPage() {
       setEventTitle('');
       setEventDescription('');
       setEventTime('');
+      setEventLocation('');
       setMaxParticipants(1);
-      setIsTeacherMode(isUserTeacher);
-      setTeacherPassword('');
-      setPasswordError('');
-      setEventStartTime(format(new Date(), 'yyyy-MM-dd, HH:mm'));
-      setEventEndTime(format(new Date(), 'yyyy-MM-dd, HH:mm'));
+      setEventStartTime('');
+      setEventEndTime('');
     };
 
     useEffect(() => {
@@ -461,75 +393,33 @@ export default function CalendarPage() {
         router.push('/login');
       }
     }, [user, router]);
-  
-    const addMeeting = async (meetingData) => {
-      try {
-        await addDoc(collection(db, 'meetings'), {
-          ...meetingData,
-          userId: user.uid,
-          createdAt: serverTimestamp()
-        });
-      } catch (error) {
-        console.error('Error adding meeting:', error);
-      }
-    };
-  
-    const fetchMeetings = async () => {
-      try {
-        const q = query(
-          collection(db, 'meetings'), 
-          where('userId', '==', user.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        const meetings = [];
-        querySnapshot.forEach((doc) => {
-          meetings.push({ id: doc.id, ...doc.data() });
-        });
-        return meetings;
-      } catch (error) {
-        console.error('Error fetching meetings:', error);
-        return [];
-      }
-    };
 
     const [notifications, setNotifications] = useState([]);
-    const [showNotifications, setShowNotifications] = useState(false);
     
     const fetchNotifications = async () => {
       if (!user) return;
       
       try {
-        const q = query(
-          collection(db, 'notifications'),
-          where('userId', '==', user.uid),
-          where('read', '==', false)
-        );
-        
-        const querySnapshot = await getDocs(q);
-        const notificationsList = [];
-        querySnapshot.forEach((doc) => {
-          notificationsList.push({ id: doc.id, ...doc.data() });
+        const response = await fetch('/api/notifications/unread', {
+          credentials: 'include'
         });
-        setNotifications(notificationsList);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch notifications');
+        }
+        
+        const data = await response.json();
+        setNotifications(data.notifications);
       } catch (err) {
         console.error('Error fetching notifications:', err);
       }
     };
     
-   
-
-    const makeUserTeacher = async (userId) => {
-      try {
-        const userRef = doc(db, 'users', userId);
-        await updateDoc(userRef, {
-          role: 'teacher'
-        });
-        alert('User is now a teacher');
-      } catch (error) {
-        console.error('Error updating user role:', error);
+    useEffect(() => {
+      if (user) {
+        fetchNotifications();
       }
-    };
-
+    }, [user]);
 
     let today = startOfToday()
     let [selectedDay, setSelectedDay] = useState(today)
@@ -550,9 +440,6 @@ export default function CalendarPage() {
       let firstDayNextMonth = add(firstDayCurrentMonth, { months: 1 })
       setCurrentMonth(format(firstDayNextMonth, 'MMM-yyyy'))
     }
-    
- 
-
     
 return (
   <AuthGuard>
@@ -585,7 +472,6 @@ return (
                     <h3 className="text-lg font-semibold mb-4">Create New Event</h3>
                     <form onSubmit={createEvent}>
                       <div className="space-y-4">
-                        {/* Regular form fields remain the same */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Title</label>
                           <input
@@ -619,40 +505,44 @@ return (
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">Time</label>
+                          <label className="block text-sm font-medium text-gray-700">Start Time</label>
                           <input
                             type="time"
                             value={eventTime}
-                            onChange={(e) => {setEventTime(e.target.value)
-                                setEventStartTime(format(selectedDate, 'yyyy-MM-dd') + 'T' + e.target.value)
+                            onChange={(e) => {
+                              setEventTime(e.target.value);
+                              setEventStartTime(format(selectedDate, 'yyyy-MM-dd') + 'T' + e.target.value);
                             }}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                             required
                           />
                         </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Location</label>
-                            <input
-                              type="text"
-                              value={eventLocation}
-                              onChange={(e) => setEventLocation(e.target.value)}
-                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                              required
-                              ></input>
-                          </div>
+                        
                         <div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">End time</label>
-                            <input 
-                              type="time"
-                              value={eventEndTime}
-                              onChange={(e) => {setEventEndTime(e.target.value)
-                                  setEventEndTime(format(selectedDate, 'yyyy-MM-dd') + 'T' + e.target.value)
-                              }}
-                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                              required
-                            />
-                          </div>
+                          <label className="block text-sm font-medium text-gray-700">End Time</label>
+                          <input 
+                            type="time"
+                            value={eventEndTime}
+                            onChange={(e) => {
+                              setEventEndTime(e.target.value);
+                            }}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Location</label>
+                          <input
+                            type="text"
+                            value={eventLocation}
+                            onChange={(e) => setEventLocation(e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                            required
+                          />
+                        </div>
+                          
+                        <div>
                           <label className="block text-sm font-medium text-gray-700">Max Participants</label>
                           <input
                             type="number"
@@ -846,16 +736,12 @@ return (
                   .map((event) => {
                     const isTeacher = event.creatorRole === 'teacher';
                     const userColor = getUserColor(event.creatorEmail || 'unknown@email.com', isTeacher);
-                    const isCreator = event.creatorId === user?.uid;
-                    const hasJoined = event.participants.includes(user?.uid);
+                    const isCreator = event.creatorId === user?.id;
+                    const hasJoined = event.participants && event.participants.includes(user?.id);
                     const isFull = event.currentParticipants >= event.maxParticipants;
 
                     return (
-                      <a 
-                        href={`/events/${event.id}`}
-                        className='block bg-white rounded-lg shadow-sm hover:shadow-md transition'
-                        >
-                        <li key={event.id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
+                      <li key={event._id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
                         <div className={`w-3 h-3 ${userColor} rounded-full flex-shrink-0`}></div>
                         
                         <div className="flex-auto">
@@ -875,7 +761,7 @@ return (
                           {/* Join button - only show if not creator, not joined, and not full */}
                           {!isCreator && !hasJoined && !isFull && (
                             <button
-                              onClick={() => joinEvent(event.id)}
+                              onClick={() => joinEvent(event._id)}
                               className="px-3 py-1 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700"
                             >
                               Join
@@ -887,7 +773,7 @@ return (
                             <button
                               onClick={() => {
                                 if (window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-                                  deleteEvent(event.id);
+                                  deleteEvent(event._id);
                                 }
                               }}
                               className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600"
@@ -897,7 +783,6 @@ return (
                           )}
                         </div>
                       </li>
-                      </a>
                     );
                   })}
               </ol>
@@ -921,228 +806,3 @@ const colStartClasses = [
   'col-start-6',
   'col-start-7',
 ]
-
-import React, { useEffect, useState } from "react";
-import { useAuth } from "./api/context/AuthContext";
-import Link from "next/link";
-import { MdEdit, MdLogout, MdEvent, MdMessage, MdStar } from "react-icons/md";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import AuthGuard from "./api/AuthGuard";
-import Layout from "../components/layout/Layout";
-import Sidebar from "../components/layout/Sidebar";
-
-function BecomeTeacher({ user, onSuccess }) {
-  const [showTeacherForm, setShowTeacherForm] = useState(false);
-  const [teacherPassword, setTeacherPassword] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [isTeacher, setIsTeacher] = useState(false);
-
-  useEffect(() => {
-    const checkTeacherStatus = async () => {
-      if (!user) return;
-
-      try {
-        const response = await fetch(`/api/users/${user.id}`);
-        const data = await response.json();
-        if (data.role === "teacher") {
-          setIsTeacher(true);
-        }
-      } catch (error) {
-        console.error("Error checking teacher status:", error);
-      }
-    };
-
-    checkTeacherStatus();
-  }, [user]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-    setLoading(true);
-
-    if (teacherPassword !== "1234") {
-      setError("Invalid teacher password");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/users/${user.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ role: "teacher" }),
-      });
-
-      if (response.ok) {
-        setSuccess("Your account has been upgraded to teacher status!");
-        setTeacherPassword("");
-        setIsTeacher(true);
-
-        if (onSuccess) onSuccess();
-
-        setTimeout(() => {
-          setShowTeacherForm(false);
-        }, 2000);
-      } else {
-        setError("Failed to update your account. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error updating user role:", error);
-      setError("Failed to update your account. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (isTeacher) {
-    return (
-      <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
-        <label className="block text-sm font-medium text-gray-500 mb-1">Teacher Status</label>
-        <div className="flex items-center">
-          <span className="px-2 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-md">
-            Teacher
-          </span>
-          <p className="ml-2 text-gray-600 text-sm">You have teacher privileges</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
-      <label className="block text-sm font-medium text-gray-500 mb-1">Teacher Status</label>
-
-      {!showTeacherForm ? (
-        <button
-          onClick={() => setShowTeacherForm(true)}
-          className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
-        >
-          Become a Teacher
-        </button>
-      ) : (
-        <div className="mt-2">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <input
-                type="password"
-                value={teacherPassword}
-                onChange={(e) => setTeacherPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
-                placeholder="Enter teacher password"
-                required
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Enter the teacher password to verify your teacher status.
-              </p>
-            </div>
-
-            {error && <div className="text-red-600 text-sm">{error}</div>}
-
-            {success && <div className="text-green-600 text-sm">{success}</div>}
-
-            <div className="flex space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowTeacherForm(false)}
-                className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 text-sm"
-              >
-                {loading ? "Verifying..." : "Verify"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function Account() {
-  const { user, logout } = useAuth();
-  const [currentUser, setCurrentUser] = useState(user);
-  const [error, setError] = useState("");
-  const [profileImage, setProfileImage] = useState(null);
-  const [eventsJoined, setEventsJoined] = useState([]);
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.push("/login");
-    } catch (error) {
-      setError("Failed to log out");
-    }
-  };
-
-  useEffect(() => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    const fetchUserData = async () => {
-      try {
-        const response = await fetch(`/api/users/${user.id}`);
-        const data = await response.json();
-        setCurrentUser(data);
-        setProfileImage(data.photoURL);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
-
-    fetchUserData();
-  }, [user]);
-
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const response = await fetch(`/api/events?userId=${user.id}`);
-        const data = await response.json();
-        setEventsJoined(data);
-      } catch (error) {
-        console.error("Error fetching events:", error);
-      }
-    };
-
-    if (user) {
-      fetchEvents();
-    }
-  }, [user]);
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-xl text-gray-600">Loading...</div>
-      </div>
-    );
-  }
-
-  return (
-    <AuthGuard>
-      <Head>
-        <title>Account | Studentious</title>
-        <meta name="description" content="Manage your account settings" />
-      </Head>
-
-      <Layout>
-        <Sidebar />
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-50">
-          {/* Account content here */}
-        </div>
-      </Layout>
-    </AuthGuard>
-  );
-}

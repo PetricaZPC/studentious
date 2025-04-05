@@ -1,8 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "./api/context/AuthContext";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "./api/config/firebaseConfig";
-import { doc, getDoc, updateDoc, query, collection, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import Link from "next/link";
 import { MdEdit, MdLogout, MdEvent, MdMessage, MdStar, MdSettings } from "react-icons/md"; 
 import Head from "next/head";
@@ -19,15 +16,30 @@ function BecomeTeacher({ user, onSuccess }) {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [isTeacher, setIsTeacher] = useState(false);
+  const checkedRef = useRef(false);
   
   useEffect(() => {
+    // Only check once per component mount
+    if (!user || checkedRef.current) return;
+    
     const checkTeacherStatus = async () => {
-      if (!user) return;
-      
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'teacher') {
-          setIsTeacher(true);
+        checkedRef.current = true;
+        
+        const response = await fetch('/api/users/check-teacher', {
+          method: 'GET',
+          credentials: 'include',
+          // Add cache control headers to prevent browser cache
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsTeacher(data.isTeacher);
         }
       } catch (error) {
         console.error('Error checking teacher status:', error);
@@ -35,6 +47,11 @@ function BecomeTeacher({ user, onSuccess }) {
     };
     
     checkTeacherStatus();
+    
+    // Clean up function
+    return () => {
+      checkedRef.current = false;
+    };
   }, [user]);
   
   const handleSubmit = async (e) => {
@@ -50,10 +67,19 @@ function BecomeTeacher({ user, onSuccess }) {
     }
     
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        role: 'teacher'
+      const response = await fetch('/api/users/become-teacher', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ teacherPassword }),
+        credentials: 'include'
       });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to update role');
+      }
       
       setSuccess('Your account has been upgraded to teacher status!');
       setTeacherPassword('');
@@ -147,13 +173,17 @@ function BecomeTeacher({ user, onSuccess }) {
 }
 
 export default function Account() {
-  const { user, logout, getEvents } = useAuth(); // Access getEvents from useAuth
+  const { user, logout, refreshUser } = useAuth();
   const [currentUser, setCurrentUser] = useState(user);
   const [error, setError] = useState("");
   const [profileImage, setProfileImage] = useState(null);
   const [eventsJoined, setEventsJoined] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
+  const [userMeta, setUserMeta] = useState({
+    creationTime: null,
+    lastSignInTime: null
+  });
 
   const router = useRouter();
 
@@ -167,30 +197,138 @@ export default function Account() {
   };
 
   useEffect(() => {
+    if (user) {
+      const fetchCurrentUserData = async () => {
+        try {
+          // Check if we're coming from an update
+          const isUpdated = router.query.updated !== undefined;
+          
+          console.log('Account page loading, isUpdated:', isUpdated);
+          console.log('Current user from context:', user);
+          
+          if (isUpdated) {
+            // Completely fresh load of all user data
+            console.log('Performing complete user data refresh');
+            
+            // 1. Refresh auth context user data
+            const freshData = await refreshUser();
+            console.log('Fresh user data from context refresh:', freshData);
+            
+            // 2. Get profile data directly from API with cache busting
+            const timestamp = Date.now();
+            const profileResponse = await fetch(`/api/users/profile?fresh=true&t=${timestamp}`, {
+              credentials: 'include',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+              }
+            });
+            
+            if (profileResponse.ok) {
+              const profileData = await profileResponse.json();
+              console.log('Fresh profile data from API:', profileData);
+              
+              // 3. Set current user from BOTH data sources
+              setCurrentUser({
+                ...user,
+                ...(freshData || {}),
+                ...profileData
+              });
+              
+              // Set profile image if available
+              if (profileData.photoURL) {
+                setProfileImage(profileData.photoURL);
+              }
+
+              console.log('Updated local state with combined data');
+            }
+            
+            // 4. Remove the updated parameter to prevent future refreshes, but keep the page
+            const { updated, ...restQuery } = router.query;
+            router.replace(
+              { pathname: router.pathname, query: restQuery }, 
+              undefined, 
+              { shallow: true }
+            );
+          } else {
+            // Normal page load - refresh data once anyway
+            console.log('Normal page load - setting currentUser from context');
+            
+            // Still fetch fresh data, but less aggressively
+            const profileResponse = await fetch('/api/users/profile', {
+              credentials: 'include'
+            });
+            
+            if (profileResponse.ok) {
+              const profileData = await profileResponse.json();
+              
+              setCurrentUser({
+                ...user,
+                ...profileData
+              });
+              
+              if (profileData.photoURL) {
+                setProfileImage(profileData.photoURL);
+              }
+            } else {
+              // Fallback to just user context
+              setCurrentUser(user);
+            }
+          }
+        } catch (error) {
+          console.error('Error refreshing user data:', error);
+          // Fallback to just using the context user
+          setCurrentUser(user);
+        }
+      };
+      
+      fetchCurrentUserData();
+    }
+  }, [user, router.query.updated, refreshUser, router]);
+
+  useEffect(() => {
     if (!user) {
       router.push('/login');
-      return;
+    } else {
+      setCurrentUser(user);
+      
+      // Fetch user metadata
+      const fetchUserMeta = async () => {
+        try {
+          const response = await fetch('/api/users/metadata', {
+            credentials: 'include'
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setUserMeta({
+              creationTime: data.createdAt,
+              lastSignInTime: data.lastSignIn
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching user metadata:', error);
+        }
+      };
+      
+      fetchUserMeta();
     }
-
-    const unsubscribe = onAuthStateChanged(auth, (updatedUser) => {
-      if (updatedUser) {
-        setCurrentUser(updatedUser);
-      } else {
-        router.push('/login');
-      }
-    });
-
-    return () => unsubscribe();
   }, [user, router]);
 
   useEffect(() => {
     if (user) {
       const fetchProfileImage = async () => {
         try {
-          const docRef = doc(db, 'userProfiles', user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists() && docSnap.data().photoURL) {
-            setProfileImage(docSnap.data().photoURL);
+          const response = await fetch('/api/users/profile', {
+            credentials: 'include'
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.photoURL) {
+              setProfileImage(data.photoURL);
+            }
           }
         } catch (error) {
           console.error('Error fetching profile image:', error);
@@ -203,16 +341,23 @@ export default function Account() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const events = await getEvents(); // Use getEvents from AuthContext
-        setEventsJoined(events);
+        const response = await fetch('/api/users/events', {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setEventsJoined(data.events);
+        }
       } catch (error) {
         console.error('Error fetching events:', error);
       }
     };
+    
     if (user) {
       fetchEvents();
     }
-  }, [user, getEvents]);
+  }, [user]);
 
   const fetchRecentActivities = async () => {
     if (!user) return;
@@ -220,27 +365,14 @@ export default function Account() {
     try {
       setLoadingActivities(true);
       
-      // Get user's joined events
-      const eventsQuery = query(
-        collection(db, 'events'),
-        where('participants', 'array-contains', user.uid),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      );
+      const response = await fetch('/api/users/activities', {
+        credentials: 'include'
+      });
       
-      const eventsSnapshot = await getDocs(eventsQuery);
-      const activities = eventsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        type: 'event',
-        title: doc.data().title,
-        description: doc.data().description,
-        date: doc.data().date,
-        time: doc.data().time,
-        timestamp: doc.data().createdAt,
-        isCreator: doc.data().creatorId === user.uid
-      }));
-  
-      setRecentActivities(activities);
+      if (response.ok) {
+        const data = await response.json();
+        setRecentActivities(data.activities);
+      }
     } catch (error) {
       console.error('Error fetching recent activities:', error);
     } finally {
@@ -288,7 +420,7 @@ export default function Account() {
           </div>
           <div className="mt-2 sm:mt-0 sm:ml-4 sm:mb-2 text-center sm:text-left">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 sm:text-gray-800">
-              {currentUser?.displayName || "My Account"}
+              {currentUser?.fullName || currentUser?.email || "My Account"}
             </h1>
             <p className="text-gray-600 sm:text-gray-600">{currentUser?.email}</p>
           </div>
@@ -328,13 +460,13 @@ export default function Account() {
                 </div>
                 <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
                   <label className="block text-sm font-medium text-gray-500 mb-1">Display Name</label>
-                  <p className="text-gray-800 font-medium">{currentUser?.displayName || "Not set"}</p>
+                  <p className="text-gray-800 font-medium">{currentUser?.fullName || "Not set"}</p>
                 </div>
                 <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
                   <label className="block text-sm font-medium text-gray-500 mb-1">Account Created</label>
                   <p className="text-gray-800 font-medium">
-                    {currentUser?.metadata?.creationTime 
-                      ? new Date(currentUser.metadata.creationTime).toLocaleDateString('en-US', {
+                    {userMeta.creationTime 
+                      ? new Date(userMeta.creationTime).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric'
@@ -345,8 +477,8 @@ export default function Account() {
                 <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
                   <label className="block text-sm font-medium text-gray-500 mb-1">Last Sign In</label>
                   <p className="text-gray-800 font-medium">
-                    {currentUser?.metadata?.lastSignInTime
-                      ? new Date(currentUser.metadata.lastSignInTime).toLocaleDateString('en-US', {
+                    {userMeta.lastSignInTime
+                      ? new Date(userMeta.lastSignInTime).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric'
@@ -378,7 +510,7 @@ export default function Account() {
               ) : recentActivities.length > 0 ? (
                 <div className="space-y-4">
                   {recentActivities.map((activity) => (
-                    <div key={activity.id} className="p-3 rounded-lg border border-gray-100 hover:bg-purple-50 transition-colors">
+                    <div key={activity._id} className="p-3 rounded-lg border border-gray-100 hover:bg-purple-50 transition-colors">
                       <div className="flex items-center mb-2">
                         <div className="bg-purple-100 p-2 rounded-lg">
                           <MdEvent className="text-xl text-purple-600" />
@@ -398,7 +530,7 @@ export default function Account() {
                           {activity.time}
                         </span>
                         <Link 
-                          href={`/calendar?event=${activity.id}`}
+                          href={`/calendar?event=${activity._id}`}
                           className="text-xs text-purple-600 hover:text-purple-800"
                         >
                           View details
@@ -439,7 +571,6 @@ export default function Account() {
                   <div className="ml-4 flex-1">
                     <p className="text-sm text-gray-500">Events Joined</p>
                     <p className="text-2xl font-semibold text-gray-800">{eventsJoined.length}</p>
-                    {console.log(eventsJoined.length)}
                   </div>
                 </div>
                 

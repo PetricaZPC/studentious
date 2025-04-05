@@ -126,12 +126,49 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Refresh user function
+  const refreshUser = async () => {
+    try {
+      const cacheBuster = Date.now();
+      const response = await fetch(`/api/users/me?_=${cacheBuster}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update the user state with the fresh data
+        setUser({
+          email: data.email,
+          fullName: data.fullName,
+          id: data.id,
+          role: data.role
+        });
+        
+        // Clear any cached profile data
+        if (typeof window !== 'undefined' && window.clearProfileCache) {
+          window.clearProfileCache();
+        }
+        
+        return data; // Important: return the data for components to use
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+    return null;
+  };
+
   const value = {
     user,
     loading,
     login,
     signup,
     logout,
+    refreshUser, // Add this
     isAuthenticated: !!user
   };
 
