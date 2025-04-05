@@ -13,6 +13,7 @@ export default function CoursesContent() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [viewingCourse, setViewingCourse] = useState(null);
+  const [viewingSummary, setViewingSummary] = useState(null);
   const [summarizingCourseId, setSummarizingCourseId] = useState(null);
 
   useEffect(() => {
@@ -46,7 +47,6 @@ export default function CoursesContent() {
     const selectedFile = e.target.files[0];
     if (!selectedFile) return;
     
-    // Check file type
     const fileType = selectedFile.name.split('.').pop().toLowerCase();
     if (fileType !== 'pdf' && fileType !== 'doc' && fileType !== 'docx') {
       setError('Please upload only PDF or Word documents');
@@ -54,7 +54,6 @@ export default function CoursesContent() {
       return;
     }
     
-    // Check file size (max 5MB)
     if (selectedFile.size > 5 * 1024 * 1024) {
       setError('File size must be less than 5MB');
       setFile(null);
@@ -83,13 +82,11 @@ export default function CoursesContent() {
       setSuccess('');
       setIsUploading(true);
       
-      // 1. Create FormData for file upload
       const formData = new FormData();
       formData.append('file', file);
       formData.append('name', courseName);
       formData.append('description', courseDescription);
       
-      // 2. Upload file and course data to MongoDB via API
       const response = await fetch('/api/courses/create', {
         method: 'POST',
         body: formData,
@@ -108,11 +105,9 @@ export default function CoursesContent() {
       setCourseDescription('');
       setFile(null);
       
-      // 3. Request summary (already handled by backend in this case)
       setIsSummarizing(true);
       await generateSummary(data.courseId, data.fileUrl, data.fileType);
       
-      // 4. Refresh course list
       fetchCourses();
       
     } catch (err) {
@@ -145,7 +140,7 @@ export default function CoursesContent() {
       }
       
       await response.json();
-      fetchCourses(); // Refresh to show the new summary
+      fetchCourses();
     } catch (err) {
       console.error('Error generating summary:', err);
     } finally {
@@ -157,8 +152,16 @@ export default function CoursesContent() {
     setViewingCourse(course);
   };
 
+  const viewSummary = (course) => {
+    setViewingSummary(course);
+  };
+
   const closeViewer = () => {
     setViewingCourse(null);
+  };
+
+  const closeSummaryViewer = () => {
+    setViewingSummary(null);
   };
 
   return (<div className="w-full max-w-6xl mx-auto">
@@ -166,7 +169,6 @@ export default function CoursesContent() {
       <div className="w-full max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-center mb-8">Course Management</h1>
         
-        {/* Upload Form */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Upload New Course</h2>
           
@@ -243,7 +245,6 @@ export default function CoursesContent() {
           </form>
         </div>
         
-        {/* Course List */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">My Courses</h2>
           
@@ -273,8 +274,16 @@ export default function CoursesContent() {
                   
                   {course.summarized && (
                     <div className="mt-3 bg-gray-50 p-3 rounded-md">
-                      <h4 className="text-sm font-medium mb-1">AI Summary:</h4>
-                      <p className="text-sm text-gray-700 line-clamp-3">{course.summary}</p>
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-sm font-medium mb-1">AI Summary:</h4>
+                        <button
+                          onClick={() => viewSummary(course)}
+                          className="text-xs text-blue-500 hover:text-blue-700"
+                        >
+                          View Full Summary
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-700 line-clamp-3">{course.summary.split('\n')[0]}</p>
                     </div>
                   )}
                   
@@ -329,17 +338,32 @@ export default function CoursesContent() {
       </div>
     </div>
     
-    {/* Document Viewer Modal */}
     {viewingCourse && (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg w-full max-w-4xl h-5/6 flex flex-col">
           <div className="flex justify-between items-center p-4 border-b">
             <h3 className="text-lg font-semibold">{viewingCourse.name}</h3>
-            <button onClick={closeViewer} className="text-gray-500 hover:text-gray-700">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center">
+              {viewingCourse.summarized && (
+                <button
+                  onClick={() => {
+                    closeViewer();
+                    viewSummary(viewingCourse);
+                  }}
+                  className="mr-4 text-blue-500 hover:text-blue-700 flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm11 1H6v8l4-2 4 2V6z" clipRule="evenodd" />
+                  </svg>
+                  View Summary
+                </button>
+              )}
+              <button onClick={closeViewer} className="text-gray-500 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           
           <div className="flex-1 overflow-auto p-4">
@@ -365,13 +389,60 @@ export default function CoursesContent() {
               </div>
             )}
           </div>
-          
-          {viewingCourse.summarized && (
-            <div className="p-4 border-t">
-              <h4 className="font-medium mb-2">AI Summary</h4>
-              <p className="text-gray-700">{viewingCourse.summary}</p>
+        </div>
+      </div>
+    )}
+
+    {viewingSummary && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg w-full max-w-4xl h-5/6 flex flex-col">
+          <div className="flex justify-between items-center p-4 border-b">
+            <h3 className="text-lg font-semibold">
+              Summary: {viewingSummary.name}
+            </h3>
+            <div className="flex items-center">
+              <button
+                onClick={() => {
+                  closeSummaryViewer();
+                  viewCourse(viewingSummary);
+                }}
+                className="mr-4 text-blue-500 hover:text-blue-700 flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                </svg>
+                View Document
+              </button>
+              <button onClick={closeSummaryViewer} className="text-gray-500 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-          )}
+          </div>
+          
+          <div className="flex-1 overflow-auto p-6">
+            <div className="prose prose-blue max-w-none">
+              {viewingSummary.summary.split('\n').map((line, i) => (
+                line.startsWith('##') ? (
+                  <h2 key={i} className="text-xl font-bold mt-6 mb-3">{line.replace('##', '').trim()}</h2>
+                ) : line.startsWith('•') ? (
+                  <div key={i} className="flex items-start mb-2">
+                    <span className="text-blue-500 mr-2">•</span>
+                    <p className="margin-0">{line.substring(1).trim()}</p>
+                  </div>
+                ) : (
+                  <p key={i} className={line.trim() === '' ? 'my-4' : 'my-2'}>{line}</p>
+                )
+              ))}
+            </div>
+            
+            <div className="mt-8 pt-6 border-t text-sm text-gray-500">
+              <p>Generated on: {viewingSummary.summaryDate ? new Date(viewingSummary.summaryDate).toLocaleString() : 'Unknown'}</p>
+              <p>Summary type: {viewingSummary.summaryType === 'ai' ? 'AI-powered' : 'Text extraction'}</p>
+            </div>
+          </div>
         </div>
       </div>
     )}
