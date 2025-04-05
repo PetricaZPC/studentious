@@ -294,40 +294,43 @@ export default function VideoComponent({ roomId, onLeave }) {
             facingMode: 'user'
           });
           
-          // Set audio track for local use (but don't play it to avoid echo)
+          // Set tracks in state
           setLocalAudioTrack(audioTrack);
           setLocalVideoTrack(videoTrack);
           
-          // Play local video
+          // Play local video only (not audio to avoid echo)
           if (localVideoRef.current) {
             videoTrack.play(localVideoRef.current);
           }
           
-          // Explicitly ensure tracks are unmuted before publishing
-          await audioTrack.setMuted(false);
-          await videoTrack.setMuted(false);
+          // IMPORTANT: Only use setEnabled OR setMuted, not both!
+          // Let's use setEnabled for consistency
+          await audioTrack.setEnabled(true);
+          await videoTrack.setEnabled(true);
           
-          // Publish audio track first, then video track separately
-          console.log('Publishing audio track...');
+          // Publish tracks
+          console.log('Publishing tracks...');
           try {
-            await agoraClient.current.publish(audioTrack);
-            console.log('Audio track published successfully');
-            
-            console.log('Publishing video track...');
-            await agoraClient.current.publish(videoTrack);
-            console.log('Video track published successfully');
+            await agoraClient.current.publish([audioTrack, videoTrack]);
+            console.log('All tracks published successfully');
           } catch (publishError) {
             console.error('Failed to publish tracks:', publishError);
             
-            // Try republishing just audio if initial publish fails
-            if (!publishError.message.includes('already-published')) {
+            // Try publishing tracks separately
+            try {
+              console.log('Trying to publish audio track separately...');
+              await agoraClient.current.publish(audioTrack);
+              console.log('Audio track published successfully');
+              
               try {
-                await agoraClient.current.unpublish();
-                await agoraClient.current.publish(audioTrack);
-                console.log('Audio track republished after error');
-              } catch (audioError) {
-                console.error('Failed to republish audio:', audioError);
+                console.log('Trying to publish video track separately...');
+                await agoraClient.current.publish(videoTrack);
+                console.log('Video track published successfully');
+              } catch (videoError) {
+                console.error('Failed to publish video track:', videoError);
               }
+            } catch (audioError) {
+              console.error('Failed to publish audio track:', audioError);
             }
           }
           
@@ -382,27 +385,29 @@ export default function VideoComponent({ roomId, onLeave }) {
           <button
             onClick={() => {
               if (localAudioTrack) {
-                const newMutedState = !isAudioMuted;
-                console.log(`Setting audio muted state to: ${newMutedState}`);
-                
-                // Use the proper method to mute/unmute
-                localAudioTrack.setEnabled(!newMutedState);
-                
-                // Also try the setMuted method as fallback
-                localAudioTrack.setMuted(newMutedState);
-                
-                // Log the state after changing
-                console.log(`After toggle - track enabled: ${localAudioTrack.enabled}, muted: ${localAudioTrack.muted}`);
-                
-                // Update state
-                setIsAudioMuted(newMutedState);
+                try {
+                  const newMutedState = !isAudioMuted;
+                  console.log(`Setting audio muted state to: ${newMutedState}`);
+                  
+                  // Use ONLY setEnabled (not both methods)
+                  localAudioTrack.setEnabled(!newMutedState);
+                  
+                  // Update state
+                  setIsAudioMuted(newMutedState);
+                  
+                  console.log(`After toggle - track enabled: ${!newMutedState}`);
+                } catch (err) {
+                  console.error('Error toggling audio:', err);
+                }
               }
             }}
             className={`p-2 rounded-full ${isAudioMuted ? 'bg-red-500' : 'bg-gray-600'}`}
           >
             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                d={isAudioMuted ? "M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" : "M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"} 
+                d={isAudioMuted 
+                  ? "M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" 
+                  : "M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"} 
               />
             </svg>
           </button>
