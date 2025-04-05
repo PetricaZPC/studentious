@@ -1,13 +1,13 @@
 import clientPromise from '../auth/mongodb';
 import { RtcTokenBuilder, RtcRole } from 'agora-access-token';
+import { v4 as uuidv4 } from 'uuid';
 import { serialize } from 'cookie';
 
 export default async function handler(req, res) {
-  // Set CORS headers to ensure the API works from different origins during dev
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
   
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
@@ -19,44 +19,41 @@ export default async function handler(req, res) {
   }
   
   try {
-    // SIMPLIFIED AUTH FOR DEVELOPMENT
-    // This will allow the endpoint to work during development
-    let userId = 'dev-user';
-    let userName = 'Development User';
+    // Get channel name
+    const { channel } = req.query;
     
-    if (process.env.NODE_ENV === 'production') {
-      // In production, use proper auth
-      const sessionId = req.cookies.sessionId;
-      if (!sessionId) {
-        return res.status(401).json({ message: "You must be logged in." });
-      }
-
-      // Validate sessionId in DB
-      const client = await clientPromise;
-      const db = client.db('accounts');
-      const user = await db.collection('users').findOne({ sessionId });
-      if (!user) {
-        return res.status(401).json({ message: "You must be logged in." });
-      }
-      userId = user._id.toString();
-      userName = user.name || user.email;
-    }
-
-    const { channelName } = req.query;
-    if (!channelName) {
+    if (!channel) {
       return res.status(400).json({ message: "Channel name is required" });
     }
-
-    // Get Agora credentials from environment variables
+    
+    // Get or create a unique browser identity
+    let userId = req.cookies.chatUserId;
+    let userName = req.cookies.chatUserName;
+    
+    if (!userId) {
+      userId = `user-${uuidv4().substring(0, 8)}`;
+      userName = `User-${Math.floor(Math.random() * 10000)}`;
+      
+      // Set cookies to persist this identity
+      res.setHeader('Set-Cookie', [
+        `chatUserId=${userId}; Path=/; Max-Age=86400; SameSite=Lax`,
+        `chatUserName=${userName}; Path=/; Max-Age=86400; SameSite=Lax`
+      ]);
+    }
+    
+    // Configure Agora
     const appId = process.env.AGORA_APP_ID;
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
-
+    
     if (!appId || !appCertificate) {
       return res.status(500).json({ message: "Agora credentials not configured" });
     }
-
-    // Generate a UID for this user in this channel
-    const uid = Math.floor(Math.random() * 100000);
+    
+    // Create a numeric UID derived from user ID
+    // Extract numbers from userId and ensure uniqueness
+    const uidStr = userId.replace(/[^0-9]/g, '');
+    const uid = parseInt(uidStr.substring(0, 8) || Math.floor(Math.random() * 100000));
+    
     const expirationTimeInSeconds = 3600;
     const currentTimestamp = Math.floor(Date.now() / 1000);
     const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
@@ -65,7 +62,7 @@ export default async function handler(req, res) {
     const token = RtcTokenBuilder.buildTokenWithUid(
       appId,
       appCertificate,
-      channelName,
+      channel,
       uid,
       RtcRole.PUBLISHER,
       privilegeExpiredTs
@@ -75,10 +72,10 @@ export default async function handler(req, res) {
       appId,
       token,
       uid,
-      channelName,
+      channel,
       userId,
       userName,
-      timestamp: Date.now(), // Add timestamp for debugging
+      timestamp: Date.now(),
       environment: process.env.NODE_ENV
     });
   } catch (error) {

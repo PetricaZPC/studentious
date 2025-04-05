@@ -12,6 +12,7 @@ export default function VideoComponent({ roomId, onLeave }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [participantCount, setParticipantCount] = useState(1);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const agoraClient = useRef(null);
   const localVideoRef = useRef(null);
@@ -27,10 +28,32 @@ export default function VideoComponent({ roomId, onLeave }) {
 
         // Get Agora token
         const response = await fetch(`/api/agora/token?channelName=${roomId}`);
-        const { token, appId } = await response.json();
+        const data = await response.json();
 
-        // Join channel
-        const uid = await agoraClient.current.join(appId, roomId, token, null);
+        console.log('Joining channel with UID:', data.uid, 'and name:', data.userName);
+
+        // Set current user info 
+        setCurrentUser({
+          uid: data.uid,
+          name: data.userName
+        });
+
+        // Join channel with the token
+        await agoraClient.current.join(
+          data.appId,
+          data.channel,
+          data.token,
+          data.uid
+        );
+
+        // Set user attributes to share display name
+        try {
+          await agoraClient.current.setLocalUserAttributes({
+            name: data.userName
+          });
+        } catch (err) {
+          console.warn('Failed to set user attributes:', err);
+        }
 
         // Create and publish tracks
         const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
@@ -45,13 +68,25 @@ export default function VideoComponent({ roomId, onLeave }) {
         }
 
         // Handle remote users
-        agoraClient.current.on('user-published', async (user, mediaType) => {
+        const handleUserPublished = async (user, mediaType) => {
           await agoraClient.current.subscribe(user, mediaType);
+          console.log(`Remote user ${user.uid} published ${mediaType}`);
           
+          // Try to get remote user's name
+          let userName = `User-${user.uid}`;
+          try {
+            const attrs = await agoraClient.current.getUserAttributes(user.uid);
+            if (attrs && attrs.name) {
+              userName = attrs.name;
+            }
+          } catch (err) {
+            console.warn('Failed to get user attributes:', err);
+          }
+
           if (mediaType === 'video') {
             setRemoteUsers(prev => ({
               ...prev,
-              [user.uid]: { ...prev[user.uid], videoTrack: user.videoTrack }
+              [user.uid]: { ...prev[user.uid], videoTrack: user.videoTrack, name: userName }
             }));
             
             user.videoTrack.play(`remote-video-${user.uid}`);
@@ -60,13 +95,15 @@ export default function VideoComponent({ roomId, onLeave }) {
           if (mediaType === 'audio') {
             setRemoteUsers(prev => ({
               ...prev,
-              [user.uid]: { ...prev[user.uid], audioTrack: user.audioTrack }
+              [user.uid]: { ...prev[user.uid], audioTrack: user.audioTrack, name: userName }
             }));
             user.audioTrack.play();
           }
 
           setParticipantCount(Object.keys(remoteUsers).length + 1);
-        });
+        };
+
+        agoraClient.current.on('user-published', handleUserPublished);
 
         // Handle user left
         agoraClient.current.on('user-left', (user) => {
@@ -160,7 +197,7 @@ export default function VideoComponent({ roomId, onLeave }) {
           <div key={uid} className="relative bg-black rounded-lg overflow-hidden aspect-video">
             <div id={`remote-video-${uid}`} className="absolute inset-0"></div>
             <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded">
-              User {uid}
+              {user.name || `User ${uid}`}
             </div>
           </div>
         ))}
