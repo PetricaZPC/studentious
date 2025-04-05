@@ -12,11 +12,13 @@ import {
   query, 
   where, 
   getDocs, 
+  getDoc, 
   serverTimestamp, 
   updateDoc, 
   arrayUnion,
   doc,
-  increment 
+  increment,
+  deleteDoc
 } from 'firebase/firestore'
 import {
   add,
@@ -62,8 +64,157 @@ const ChevronRightIcon = dynamic(
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ')
   }
+
+const getUserColor = (userEmail, isTeacher) => {
+  if (!isTeacher) return 'bg-gray-400';
   
-  export default function CalendarPage() {
+  const teacherColors = [
+    'bg-red-500',
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-yellow-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-indigo-500',
+    'bg-teal-500'
+  ];
+  
+  const emailHash = userEmail.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const colorIndex = emailHash % teacherColors.length;
+  
+  return teacherColors[colorIndex];
+};
+
+function Meeting({ meeting }) {
+  let startDateTime;
+  let endDateTime;
+
+  try {
+    startDateTime = parseISO(meeting.startDatetime);
+    endDateTime = parseISO(meeting.endDatetime);
+  } catch (error) {
+    console.error('Error parsing date:', error);
+    return null;
+  }
+
+  const isTeacher = meeting.creatorRole === 'teacher' || 
+                    (meeting.creatorEmail && meeting.creatorEmail.includes('@teacher'));
+  
+  const userColor = getUserColor(meeting.creatorEmail || 'unknown@email.com', isTeacher);
+
+  return (
+    <li className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
+      <div className={`w-3 h-3 ${userColor} rounded-full flex-shrink-0`}></div>
+      
+      <div className="relative w-10 h-10">
+        <Image
+          src={meeting.imageUrl}
+          alt={`${meeting.name}'s avatar`}
+          fill
+          className="rounded-full object-cover"
+        />
+      </div>
+      <div className="flex-auto">
+        <p className="text-gray-900">{meeting.name}</p>
+        <div className="flex justify-between">
+          <p className="mt-0.5">
+            <time dateTime={meeting.startDatetime}>
+              {format(startDateTime, 'h:mm a')}
+            </time>{' '}
+            -{' '}
+            <time dateTime={meeting.endDatetime}>
+              {format(endDateTime, 'h:mm a')}
+            </time>
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {meeting.creatorEmail || 'Unknown creator'}
+          </p>
+        </div>
+      </div>
+      <Menu
+        as="div"
+        className="relative opacity-0 focus-within:opacity-100 group-hover:opacity-100"
+      >
+        <div>
+          <Menu.Button className="-m-2 flex items-center rounded-full p-1.5 text-gray-500 hover:text-gray-600">
+            <span className="sr-only">Open options</span>
+            <DotsVerticalIcon className="w-6 h-6" aria-hidden="true" />
+          </Menu.Button>
+        </div>
+
+        <Transition
+          as={Fragment}
+          enter="transition ease-out duration-100"
+          enterFrom="transform opacity-0 scale-95"
+          enterTo="transform opacity-100 scale-100"
+          leave="transition ease-in duration-75"
+          leaveFrom="transform opacity-100 scale-100"
+          leaveTo="transform opacity-0 scale-95"
+        >
+          <Menu.Items className="absolute right-0 z-10 mt-2 origin-top-right bg-white rounded-md shadow-lg w-36 ring-1 ring-black ring-opacity-5 focus:outline-none">
+            <div className="py-1">
+              <Menu.Item>
+                {({ active }) => (
+                  <Link
+                    href="#"
+                    className={classNames(
+                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                      'block px-4 py-2 text-sm'
+                    )}
+                  >
+                    Edit
+                  </Link>
+                )}
+              </Menu.Item>
+              <Menu.Item>
+                {({ active }) => (
+                  <Link
+                    href="#"
+                    className={classNames(
+                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                      'block px-4 py-2 text-sm'
+                    )}
+                  >
+                    Cancel
+                  </Link>
+                )}
+              </Menu.Item>
+            </div>
+          </Menu.Items>
+        </Transition>
+      </Menu>
+    </li>
+  );
+}
+
+function CalendarLegend({ teachers }) {
+  return (
+    <div className="mt-6 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+      <h3 className="text-sm font-medium text-gray-700 mb-2">Event Creator Legend</h3>
+      <div className="space-y-2">
+        <div className="flex items-center">
+          <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
+          <span className="text-sm text-gray-600">Student</span>
+        </div>
+        
+        {teachers && teachers.length > 0 ? (
+          teachers.map((teacher, index) => (
+            <div key={index} className="flex items-center">
+              <div className={`w-3 h-3 ${getUserColor(teacher.email, true)} rounded-full mr-2`}></div>
+              <span className="text-sm text-gray-600">
+                {teacher.name || teacher.email.split('@')[0]}
+              </span>
+            </div>
+          ))
+        ) : (
+          <div className="text-sm text-gray-500">No teachers found</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function CalendarPage() {
     const { user } = useAuth();
     const router = useRouter();
     const [events, setEvents] = useState([]);
@@ -71,18 +222,34 @@ function classNames(...classes) {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [teachers, setTeachers] = useState([]);
   
-    // Add Event Modal Form State
     const [eventTitle, setEventTitle] = useState('');
     const [eventDescription, setEventDescription] = useState('');
     const [eventTime, setEventTime] = useState('');
     const [maxParticipants, setMaxParticipants] = useState(1);
+    const [isTeacherMode, setIsTeacherMode] = useState(false);
+    const [teacherPassword, setTeacherPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
   
     const createEvent = async (e) => {
       e.preventDefault();
       setLoading(true);
+      
+      // Check teacher password if teacher mode is selected
+      if (isTeacherMode) {
+        // For testing, password is 1234
+        if (teacherPassword !== '1234') {
+          setPasswordError('Invalid teacher password');
+          setLoading(false);
+          return;
+        }
+      }
+      
       try {
-        // Create the event
+        // Set role based on teacher mode
+        let userRole = isTeacherMode ? 'teacher' : 'student';
+
         const eventRef = await addDoc(collection(db, 'events'), {
           title: eventTitle,
           description: eventDescription,
@@ -93,15 +260,16 @@ function classNames(...classes) {
           participants: [user.uid],
           creatorId: user.uid,
           creatorName: user.displayName || 'Anonymous',
+          creatorEmail: user.email || 'unknown@email.com',
+          creatorRole: userRole, // Use the determined role
           createdAt: serverTimestamp()
         });
     
-        // Create notifications for all users
         const usersQuery = query(collection(db, 'users'));
         const usersSnapshot = await getDocs(usersQuery);
         
         const notificationPromises = usersSnapshot.docs
-          .filter(doc => doc.id !== user.uid) // Don't notify the creator
+          .filter(doc => doc.id !== user.uid)
           .map(doc => {
             return addDoc(collection(db, 'notifications'), {
               userId: doc.id,
@@ -146,6 +314,52 @@ function classNames(...classes) {
         console.error(err);
       }
     };
+
+    const deleteEvent = async (eventId) => {
+      try {
+        // Get the event to verify creator
+        const eventRef = doc(db, 'events', eventId);
+        const eventSnap = await getDoc(eventRef);
+        
+        if (!eventSnap.exists()) {
+          setError('Event not found');
+          return;
+        }
+        
+        const eventData = eventSnap.data();
+        
+        // Verify the current user is the creator
+        if (eventData.creatorId !== user.uid) {
+          setError('Only the event creator can delete this event');
+          return;
+        }
+        
+        // Delete the event
+        await deleteDoc(eventRef);
+        
+        // Also delete related notifications
+        const notificationsQuery = query(
+          collection(db, 'notifications'),
+          where('eventId', '==', eventId)
+        );
+        
+        const notificationsSnapshot = await getDocs(notificationsQuery);
+        const deletePromises = notificationsSnapshot.docs.map((doc) => {
+          return deleteDoc(doc.ref);
+        });
+        
+        await Promise.all(deletePromises);
+        
+        // Refresh the events list
+        fetchEvents();
+        
+        // Show success message
+        alert('Event deleted successfully');
+      } catch (err) {
+        setError('Failed to delete event');
+        console.error(err);
+      }
+    };
   
     const fetchEvents = async () => {
       try {
@@ -160,10 +374,37 @@ function classNames(...classes) {
         console.error('Error fetching events:', err);
       }
     };
+
+    const fetchTeachers = async () => {
+      try {
+        const teachersQuery = query(
+          collection(db, 'users'), 
+          where('role', '==', 'teacher')
+        );
+        
+        const snapshot = await getDocs(teachersQuery);
+        const teachersList = [];
+        
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          teachersList.push({
+            id: doc.id,
+            email: data.email,
+            name: data.fullName || data.displayName || data.email
+          });
+        });
+        
+        console.log('Teachers found:', teachersList.length);
+        setTeachers(teachersList);
+      } catch (error) {
+        console.error('Error fetching teachers:', error);
+      }
+    };
   
     useEffect(() => {
       if (user) {
         fetchEvents();
+        fetchTeachers();
       }
     }, [user]);
   
@@ -172,6 +413,9 @@ function classNames(...classes) {
       setEventDescription('');
       setEventTime('');
       setMaxParticipants(1);
+      setIsTeacherMode(false);
+      setTeacherPassword('');
+      setPasswordError('');
     };
 
     useEffect(() => {
@@ -210,7 +454,6 @@ function classNames(...classes) {
       }
     };
 
-    // Add notification handling
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
     
@@ -235,11 +478,10 @@ function classNames(...classes) {
       }
     };
     
-    // Add this to your useEffect
     useEffect(() => {
       if (user) {
         fetchNotifications();
-        const interval = setInterval(fetchNotifications, 30000); // Check every 30 seconds
+        const interval = setInterval(fetchNotifications, 30000);
         return () => clearInterval(interval);
       }
     }, [user]);
@@ -289,7 +531,6 @@ return (
                 </button>
               </div>
 
-              {/* Event Creation Modal */}
               {showEventModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
                   <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -350,6 +591,52 @@ return (
                             required
                           />
                         </div>
+                        
+                        {/* Add teacher mode checkbox */}
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id="isTeacher"
+                            checked={isTeacherMode}
+                            onChange={(e) => {
+                              setIsTeacherMode(e.target.checked);
+                              if (!e.target.checked) {
+                                setPasswordError('');
+                                setTeacherPassword('');
+                              }
+                            }}
+                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor="isTeacher" className="ml-2 block text-sm text-gray-700">
+                            I'm creating this event as a teacher
+                          </label>
+                        </div>
+                        
+                        {/* Show password field only if teacher mode is selected */}
+                        {isTeacherMode && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Teacher Password</label>
+                            <input
+                              type="password"
+                              value={teacherPassword}
+                              onChange={(e) => {
+                                setTeacherPassword(e.target.value);
+                                setPasswordError('');
+                              }}
+                              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-purple-500 ${
+                                passwordError ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
+                              }`}
+                              placeholder="Enter teacher password"
+                              required={isTeacherMode}
+                            />
+                            {passwordError && (
+                              <p className="mt-1 text-sm text-red-600">{passwordError}</p>
+                            )}
+                            <p className="mt-1 text-xs text-gray-500">
+                              Teacher events will be color-coded differently on the calendar.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="mt-6 flex justify-end space-x-3">
@@ -410,6 +697,37 @@ return (
                     isSameDay(parseISO(event.date), day)
                   );
                   
+                  // Get colors for events on this day
+                  let dayIndicatorColor = '';
+                  if (dayEvents.length > 0) {
+                    // If only one event on this day, use its creator's color
+                    if (dayEvents.length === 1) {
+                      const event = dayEvents[0];
+                      const isTeacher = event.creatorRole === 'teacher';
+                      dayIndicatorColor = getUserColor(event.creatorEmail || 'unknown@email.com', isTeacher);
+                    } 
+                    // If all events have the same creator type and color
+                    else if (dayEvents.every(event => event.creatorRole === dayEvents[0].creatorRole)) {
+                      const isTeacher = dayEvents[0].creatorRole === 'teacher';
+                      // If all teachers have the same email (same teacher)
+                      if (isTeacher && dayEvents.every(event => event.creatorEmail === dayEvents[0].creatorEmail)) {
+                        dayIndicatorColor = getUserColor(dayEvents[0].creatorEmail, true);
+                      } 
+                      // If all events are from students
+                      else if (!isTeacher) {
+                        dayIndicatorColor = 'bg-gray-400'; // Student color
+                      }
+                      // Mixed teachers or can't determine
+                      else {
+                        dayIndicatorColor = 'bg-purple-500'; // Default - mixed events
+                      }
+                    }
+                    // Multiple different creators
+                    else {
+                      dayIndicatorColor = 'bg-purple-500'; // Default for mixed creators
+                    }
+                  }
+                  
                   return (
                     <div
                       key={day.toString()}
@@ -441,8 +759,29 @@ return (
                         <time dateTime={format(day, 'yyyy-MM-dd')}>
                           {format(day, 'd')}
                         </time>
+                        
+                        {/* Render colored indicator based on event creator type */}
                         {dayEvents.length > 0 && (
-                          <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-purple-500"></span>
+                          <>
+                            {/* For single creator type */}
+                            {dayEvents.length === 1 ? (
+                              <span className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ${dayIndicatorColor}`}></span>
+                            ) : (
+                              // For multiple events, show small pie segments
+                              <div className="absolute bottom-0 right-0 w-3 h-3 flex flex-wrap overflow-hidden rounded-full border border-white">
+                                {dayEvents.slice(0, 4).map((event, i) => {
+                                  const isTeacher = event.creatorRole === 'teacher';
+                                  const color = getUserColor(event.creatorEmail || 'unknown@email.com', isTeacher);
+                                  return (
+                                    <div 
+                                      key={i} 
+                                      className={`w-1.5 h-1.5 ${color}`}
+                                    ></div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
                         )}
                       </button>
                     </div>
@@ -458,34 +797,64 @@ return (
                 </time>
               </h2>
               <ol className="mt-4 space-y-1 text-sm leading-6 text-gray-500">
-                {events.filter(event => isSameDay(parseISO(event.date), selectedDay)).length > 0 ? (
-                  events
-                    .filter(event => isSameDay(parseISO(event.date), selectedDay) && event.currentParticipants < event.maxParticipants)
-                    .map((event) => (
+                {events
+                  .filter(event => isSameDay(parseISO(event.date), selectedDay))
+                  .map((event) => {
+                    const isTeacher = event.creatorRole === 'teacher';
+                    const userColor = getUserColor(event.creatorEmail || 'unknown@email.com', isTeacher);
+                    const isCreator = event.creatorId === user?.uid;
+                    const hasJoined = event.participants.includes(user?.uid);
+                    const isFull = event.currentParticipants >= event.maxParticipants;
+
+                    return (
                       <li key={event.id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
+                        <div className={`w-3 h-3 ${userColor} rounded-full flex-shrink-0`}></div>
+                        
                         <div className="flex-auto">
                           <p className="text-gray-900 font-medium">{event.title}</p>
                           <p className="mt-0.5">{event.description}</p>
-                          <p className="mt-0.5 text-purple-600">
-                            Time: {event.time} • {event.currentParticipants}/{event.maxParticipants} participants
-                          </p>
+                          <div className="flex justify-between mt-1">
+                            <p className="text-purple-600">
+                              Time: {event.time} • {event.currentParticipants}/{event.maxParticipants} participants
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Created by: {event.creatorEmail || 'Unknown'}
+                            </p>
+                          </div>
                         </div>
-                        {event.creatorId !== user?.uid && !event.participants.includes(user?.uid) && (
-                          <button
-                            onClick={() => joinEvent(event.id)}
-                            className="px-3 py-1 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700"
-                          >
-                            Join
-                          </button>
-                        )}
+                        
+                        <div className="flex space-x-2">
+                          {/* Join button - only show if not creator, not joined, and not full */}
+                          {!isCreator && !hasJoined && !isFull && (
+                            <button
+                              onClick={() => joinEvent(event.id)}
+                              className="px-3 py-1 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                            >
+                              Join
+                            </button>
+                          )}
+                          
+                          {/* Delete button - only show for creator */}
+                          {isCreator && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+                                  deleteEvent(event.id);
+                                }
+                              }}
+                              className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </li>
-                    ))
-                ) : (
-                  <p>No events scheduled for today.</p>
-                )}
+                    );
+                  })}
               </ol>
             </section>
           </div>
+          <CalendarLegend teachers={teachers} />
         </div>
       </main>
     </div>
