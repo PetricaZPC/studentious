@@ -1,37 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './api/context/AuthContext';
-import { updateProfile } from 'firebase/auth';
-import { auth, db } from './api/config/firebaseConfig';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import Cookies from 'js-cookie';
 import imageCompression from 'browser-image-compression';
 import Sidebar from '@/components/layout/Sidebar';
+import AuthGuard from './api/AuthGuard';
 
 export default function EditAccount() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const router = useRouter();
   const [displayName, setDisplayName] = useState('');
-  const [photoURL, setPhotoURL] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef(null);
-
-
-  useEffect(() => {
-    if (user) {
-      console.log('User object:', {
-        displayName: user.displayName,
-        email: user.email,
-        metadata: user.metadata
-      });
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -40,18 +25,22 @@ export default function EditAccount() {
     }
     
     if (user) {
-      setDisplayName(user.displayName || ''); 
-      console.log('Current user display name:', user.displayName); 
+      setDisplayName(user.fullName || ''); 
       fetchProfileImage();
     }
   }, [user, router]);
 
   const fetchProfileImage = async () => {
     try {
-      const docRef = doc(db, 'userProfiles', user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists() && docSnap.data().photoURL) {
-        setPreviewUrl(docSnap.data().photoURL);
+      const response = await fetch('/api/users/profile', {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.photoURL) {
+          setPreviewUrl(data.photoURL);
+        }
       }
     } catch (error) {
       console.error('Error fetching profile image:', error);
@@ -95,47 +84,6 @@ export default function EditAccount() {
     }
   };
 
-  const handleImageUpload = async (file, userId) => {
-    if (!file || !userId) return null;
-
-    try {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          try {
-            const base64String = reader.result;
-            if (base64String.length > 150000) {
-              reject(new Error('Image still too large after compression'));
-              return;
-            }
-            
-            await setDoc(doc(db, 'userProfiles', userId), {
-              photoURL: base64String,
-              updatedAt: serverTimestamp()
-            }, { merge: true });
-            
-            resolve(base64String);
-          } catch (error) {
-            reject(error);
-          }
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    } catch (error) {
-      console.error('Upload error:', error);
-      throw new Error('Failed to upload image');
-    }
-  };
-
-  useEffect(() => {
-    const savedImage = Cookies.get('profileImage');
-    if (savedImage) {
-      setPhotoURL(savedImage);
-      setPreviewUrl(savedImage);
-    }
-  }, []);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
@@ -153,20 +101,72 @@ export default function EditAccount() {
     setMessage('');
 
     try {
-      if (displayName !== user.displayName) {
-        await updateProfile(auth.currentUser, {
-          displayName: displayName
-        });
-      }
-
+      const updateData = {
+        fullName: displayName
+      };
+      
+      // Process image if selected
       if (selectedImage) {
-        await handleImageUpload(selectedImage, user.uid);
+        const base64Image = await convertImageToBase64(selectedImage);
+        if (base64Image.length > 150000) {
+          throw new Error('Image still too large after compression');
+        }
+        updateData.photoURL = base64Image;
+      }
+      
+      console.log('Sending update with data:', updateData);
+      
+      // Update profile
+      const response = await fetch('/api/users/update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData),
+        credentials: 'include'
+      });
+      
+      const data = await response.json();
+      console.log('Profile update response:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update profile');
       }
       
       setMessage('Profile updated successfully!');
-      setTimeout(() => {
-        router.push('/account');
-      }, 2000);
+      
+      // CRITICAL: This must be a synchronous series of operations
+      try {
+        console.log('Starting refresh process...');
+        
+        // 1. Force refresh user data in auth context
+        await refreshUser();
+        console.log('Auth user refreshed');
+        
+        // 2. Clear ALL caches
+        localStorage.removeItem('profile_data');
+        sessionStorage.clear();
+        
+        // 3. Clear any session-level browser cache
+        await fetch('/api/users/clear-cache', {
+          method: 'POST',
+          credentials: 'include'
+        }).catch(e => console.log('Cache clear API call error (ignorable):', e));
+        
+        // 4. Wait before redirecting to ensure all updates have propagated
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('Redirecting to account page with cache busting...');
+        
+        // 5. Redirect with heavy cache busting
+        const timestamp = Date.now();
+        window.location.href = `/account?updated=${timestamp}&nocache=true`;
+        
+        // Don't use router.push as it might preserve some state
+        // router.push(`/account?updated=${timestamp}&nocache=true`);
+      } catch (refreshError) {
+        console.error('Error during refresh sequence:', refreshError);
+      }
     } catch (err) {
       console.error('Profile update error:', err);
       setError(err.message || 'Failed to update profile');
@@ -175,8 +175,17 @@ export default function EditAccount() {
     }
   };
 
+  const convertImageToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   return (
-    <>
+    <AuthGuard>
       <Head>
         <title>Edit Account | Studentious</title>
         <meta name="description" content="Edit your account settings" />
@@ -270,6 +279,6 @@ export default function EditAccount() {
           </div>
         </div>
       </div>
-    </>
+    </AuthGuard>
   );
 }

@@ -1,41 +1,121 @@
+import React from 'react';
 import { useAuth } from "@/pages/api/context/AuthContext";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { smartFetch, clearCache } from '@/utils/apiCache';
 
-export default function Sidebar() {
-  const { user, getUserProfile } = useAuth();
+// Create a memoized component to avoid unnecessary re-renders
+const Sidebar = React.memo(function Sidebar() {
+  const { user, refreshUser } = useAuth();
   const [currentUser, setCurrentUser] = useState(user || {});
   const [profileImage, setProfileImage] = useState(null);
+  const router = useRouter();
+  const profileFetchedRef = useRef(false);
   
   const isDashboard = usePathname() === "/";
   const isCalendar = usePathname() === "/calendar";
-  const isCourses = usePathname() === "/study";
+  const isCourses = usePathname() === "/courses"; 
   const isMessages = usePathname() === "/messages";
   const isResources = usePathname() === "/resources";
   const isAccount = usePathname() === "/account";
 
+  // Create a stable fetch function with improved caching
+  const fetchProfileData = useCallback(async (forceRefresh = false) => {
+    if (!user) return;
+    
+    // Skip if we already have data and this isn't a forced refresh
+    if (profileFetchedRef.current && !forceRefresh) return;
+    
+    try {
+      // Mark as fetched immediately to prevent parallel requests
+      profileFetchedRef.current = true;
+      
+      // Use our optimized fetch utility with caching
+      const profileData = await smartFetch('/api/users/profile', {
+        credentials: 'include',
+        skipCache: forceRefresh // Skip cache on forced refresh
+      });
+      
+      // Safely update state with new data
+      setCurrentUser(prevUser => ({
+        ...prevUser,
+        ...user,
+        ...profileData
+      }));
+      
+      if (profileData?.photoURL) {
+        setProfileImage(profileData.photoURL);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      // Reset fetched flag on error to allow retry
+      if (forceRefresh) {
+        profileFetchedRef.current = false;
+      }
+    }
+  }, [user]);
+
+  // Fetch profile once on mount or user change
   useEffect(() => {
-    // Fetch complete user profile data from MongoDB through the API
     if (user) {
-      const loadUserProfile = async () => {
+      fetchProfileData();
+    }
+    
+    // Reset on unmount
+    return () => {
+      profileFetchedRef.current = false;
+    };
+  }, [fetchProfileData, user]);
+  
+  // Handle profile updates (only when ?updated parameter exists)
+  useEffect(() => {
+    // Only refresh if user exists
+    if (user) {
+      const loadProfileData = async () => {
+        // Check if we're coming from an update operation
+        const isUpdated = router.query.updated !== undefined;
+        
         try {
-          const profileData = await getUserProfile();
-          if (profileData) {
-            setCurrentUser(profileData);
+          // Add cache busting if coming from update
+          const timestamp = isUpdated ? Date.now() : '';
+          const apiUrl = isUpdated 
+            ? `/api/users/profile?t=${timestamp}` 
+            : '/api/users/profile';
+          
+          const options = {
+            credentials: 'include',
+            headers: isUpdated ? {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            } : {}
+          };
+          
+          // Fetch profile data with potential cache busting
+          const response = await fetch(apiUrl, options);
+          
+          if (response.ok) {
+            const profileData = await response.json();
+            
+            // Update user data with profile info
+            setCurrentUser({
+              ...user,
+              ...profileData
+            });
+            
             if (profileData.photoURL) {
               setProfileImage(profileData.photoURL);
             }
           }
         } catch (error) {
-          console.error('Error fetching user profile:', error);
+          console.error('Error loading profile data:', error);
         }
       };
       
-      loadUserProfile();
+      loadProfileData();
     }
-  }, [user, getUserProfile]);
+  }, [user, router.query.updated]);
 
   return (
     <nav className="w-64 fixed left-0 top-0 h-full bg-white p-6 border-r border-gray-200 shadow-sm flex flex-col">
@@ -68,6 +148,7 @@ export default function Sidebar() {
           }
           label="Dashboard"
           active={isDashboard}
+          href="/"
         />
         <NavItem
           icon={
@@ -88,6 +169,7 @@ export default function Sidebar() {
           }
           label="Messages"
           active={isMessages}
+          href="/messages"
         />
         <NavItem
           icon={
@@ -108,6 +190,7 @@ export default function Sidebar() {
           }
           label="Study"
           active={isCourses}
+          href="/courses"
         />
         <NavItem
           icon={
@@ -128,6 +211,7 @@ export default function Sidebar() {
           }
           label="Calendar"
           active={isCalendar}
+          href="/calendar"
         />
         <NavItem
           icon={
@@ -148,6 +232,7 @@ export default function Sidebar() {
           }
           label="Resources"
           active={isResources}
+          href="/resources"
         />
       </ul>
 
@@ -176,11 +261,11 @@ export default function Sidebar() {
               </svg>
             </div>
           )}
-          <a href="/account">
+          <Link href="/account">
             <div>
               <p className="text-sm font-medium text-gray-700">{currentUser?.fullName || currentUser?.email || 'User'}</p>
             </div>
-          </a>
+          </Link>
         </div>
         <div className="mt-4 flex items-center p-2 rounded-lg hover:bg-gray-100 cursor-pointer text-gray-600 hover:text-blue-500">
           <svg
@@ -200,14 +285,14 @@ export default function Sidebar() {
       </div>
     </nav>
   );
-}
+});
 
 // Reusable NavItem component
-function NavItem({ icon, label, active = false }) {
+function NavItem({ icon, label, active = false, href }) {
   return (
     <li>
-      <a
-        href={(label !== "Dashboard") ? `/${label.toLowerCase()}` : "/"}
+      <Link
+        href={href || (label !== "Dashboard" ? `/${label.toLowerCase()}` : "/")}
         className={`flex items-center p-3 rounded-lg ${
           active
             ? "bg-blue-50 text-blue-600"
@@ -221,7 +306,9 @@ function NavItem({ icon, label, active = false }) {
         {active && (
           <span className="ml-auto h-2 w-2 bg-blue-500 rounded-full"></span>
         )}
-      </a>
+      </Link>
     </li>
   );
 }
+
+export default Sidebar;
