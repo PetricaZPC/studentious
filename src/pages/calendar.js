@@ -235,46 +235,6 @@ function CalendarLegend({ teachers }) {
   );
 }
 
-function AdminPanel() {
-  const { user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) return;
-      
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
-          setIsAdmin(true);
-        }
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-      }
-    };
-    
-    checkAdminStatus();
-  }, [user]);
-
-  if (!user || !isAdmin) {
-    return (
-      <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-        <h3 className="text-md font-semibold text-gray-800 mb-3">Admin Authentication</h3>
-        {!isAdmin && (
-          <p className="text-red-500 mb-4">You need admin privileges to access this panel.</p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-      <h3 className="text-md font-semibold text-gray-800 mb-3">Admin Panel</h3>
-      <p>Welcome, Admin!</p>
-    </div>
-  );
-}
-
 export default function CalendarPage() {
     const { user } = useAuth();
     const router = useRouter();
@@ -287,6 +247,9 @@ export default function CalendarPage() {
     const [isUserTeacher, setIsUserTeacher] = useState(false);
   
     const [eventTitle, setEventTitle] = useState('');
+    const [eventLocation, setEventLocation] = useState('');
+    const [eventStartTime, setEventStartTime] = useState('');
+    
     const [eventDescription, setEventDescription] = useState('');
     const [eventTime, setEventTime] = useState('');
     const [maxParticipants, setMaxParticipants] = useState(1);
@@ -330,7 +293,9 @@ export default function CalendarPage() {
           creatorName: user.displayName || 'Anonymous',
           creatorEmail: user.email || 'unknown@email.com',
           creatorRole: userRole, // Use the determined role
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          startTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
+          endTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
         });
         
         const usersQuery = query(collection(db, 'users'));
@@ -350,7 +315,9 @@ export default function CalendarPage() {
                 title: eventTitle,
                 description: eventDescription,
                 date: format(selectedDate, 'yyyy-MM-dd'),
-                time: eventTime
+                time: eventTime,
+                startTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
+                endTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
               },
               read: false,
               createdAt: serverTimestamp()
@@ -485,6 +452,8 @@ export default function CalendarPage() {
       setIsTeacherMode(isUserTeacher);
       setTeacherPassword('');
       setPasswordError('');
+      setEventStartTime(format(new Date(), 'yyyy-MM-dd, HH:mm'));
+      setEventEndTime(format(new Date(), 'yyyy-MM-dd, HH:mm'));
     };
 
     useEffect(() => {
@@ -582,23 +551,18 @@ export default function CalendarPage() {
       setCurrentMonth(format(firstDayNextMonth, 'MMM-yyyy'))
     }
     
-    // Add this before the CalendarLegend in your return statement
-    // Only for development/testing
-    const dummyTeachers = [
-      { id: 'dummy1', email: 'teacher1@example.com', name: 'Teacher One' },
-      { id: 'dummy2', email: 'teacher2@example.com', name: 'Teacher Two' },
-      { id: 'dummy3', email: 'teacher3@example.com', name: 'Teacher Three' }
-    ];
+ 
+
     
 return (
   <AuthGuard>
-  <Sidebar />
+    <Sidebar />
     <Head>
       <title>Calendar | Studentious</title>
       <meta name="description" content="Schedule and manage your meetings" />
     </Head>
 
-    <div className=" min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100">
       <main className="pt-16">
         <div className="max-w-md px-4 mx-auto sm:px-7 md:max-w-4xl md:px-6">
           <div className="md:grid md:grid-cols-2 md:divide-x md:divide-gray-200">
@@ -659,13 +623,36 @@ return (
                           <input
                             type="time"
                             value={eventTime}
-                            onChange={(e) => setEventTime(e.target.value)}
+                            onChange={(e) => {setEventTime(e.target.value)
+                                setEventStartTime(format(selectedDate, 'yyyy-MM-dd') + 'T' + e.target.value)
+                            }}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                             required
                           />
                         </div>
-
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Location</label>
+                            <input
+                              type="text"
+                              value={eventLocation}
+                              onChange={(e) => setEventLocation(e.target.value)}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              required
+                              ></input>
+                          </div>
                         <div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">End time</label>
+                            <input 
+                              type="time"
+                              value={eventEndTime}
+                              onChange={(e) => {setEventEndTime(e.target.value)
+                                  setEventEndTime(format(selectedDate, 'yyyy-MM-dd') + 'T' + e.target.value)
+                              }}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              required
+                            />
+                          </div>
                           <label className="block text-sm font-medium text-gray-700">Max Participants</label>
                           <input
                             type="number"
@@ -864,7 +851,11 @@ return (
                     const isFull = event.currentParticipants >= event.maxParticipants;
 
                     return (
-                      <li key={event.id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
+                      <a 
+                        href={`/events/${event.id}`}
+                        className='block bg-white rounded-lg shadow-sm hover:shadow-md transition'
+                        >
+                        <li key={event.id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
                         <div className={`w-3 h-3 ${userColor} rounded-full flex-shrink-0`}></div>
                         
                         <div className="flex-auto">
@@ -906,16 +897,17 @@ return (
                           )}
                         </div>
                       </li>
+                      </a>
                     );
                   })}
               </ol>
             </section>
           </div>
-          <CalendarLegend teachers={teachers.length > 0 ? teachers : dummyTeachers} />
+          
+          <CalendarLegend teachers={teachers} />
         </div>
       </main>
     </div>
-    <AdminPanel />
   </AuthGuard>
 )
 }

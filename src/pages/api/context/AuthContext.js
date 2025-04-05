@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
       throw error;
     }
   }
-
+  
   async function login(email, password) {
     return signInWithEmailAndPassword(auth, email, password);
   }
@@ -40,26 +40,28 @@ export function AuthProvider({ children }) {
   }
 
   async function getEvents() {
-    if (!user) return [];
-    try {
-      const eventsRef = collection(db, 'events');
-      const querySnapshot = await getDocs(eventsRef);
-
-      const userEvents = [];
-      for (const eventDoc of querySnapshot.docs) {
-        const participantsRef = collection(eventDoc.ref, 'participants');
-        const participantQuery = query(participantsRef, where('userId', '==', user.uid));
-        const participantSnapshot = await getDocs(participantQuery);
-
-        if (!participantSnapshot.empty) {
-          userEvents.push({ id: eventDoc.id, ...eventDoc.data() });
-        }
+    if(!user) return [];
+    try{
+      const eventRef = doc(db,"events");
+      const docSnap = await getDoc(eventRef);
+      if(docSnap.exists()){
+        return {id: docSnap.id, ...docSnap.data()};
+      }else{
+        console.log("Sorry nu avem eventuri de loc");
       }
+    }catch(error){
+      console.log("nu esti bun bosule ")
+    }
+  }
 
-      return userEvents;
+  async function getAllEvents() {
+    try {
+        const eventsRef = collection(db, 'events');
+        const querySnapshot = await getDocs(eventsRef);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } catch (error) {
-      console.error('Error fetching events:', error);
-      return [];
+        console.error('Error fetching events:', error);
+        return [];
     }
   }
 
@@ -105,7 +107,8 @@ export function AuthProvider({ children }) {
     login,
     logout,
     getEvents,
-    getUserProfile, // Expose getUserProfile in the context
+    getAllEvents,
+    getUserProfile,
     loading
 };
 

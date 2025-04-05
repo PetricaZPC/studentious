@@ -13,7 +13,7 @@ export default function Sidebar() {
   const [profileImage, setProfileImage] = useState(null);
   const isDashboard = usePathname() === "/";
   const isCalendar = usePathname() === "/calendar";
-  const isCourses = usePathname() === "/courses";
+  const isCourses = usePathname() === "/study";
   const isMessages = usePathname() === "/messages";
   const isResources = usePathname() === "/resources";
   const isAccount = usePathname() === "/account";
@@ -110,7 +110,7 @@ export default function Sidebar() {
               />
             </svg>
           }
-          label="Courses"
+          label="Study"
           active={isCourses}
         />
         <NavItem
