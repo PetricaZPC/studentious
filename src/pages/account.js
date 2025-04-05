@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "./api/context/AuthContext";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./api/config/firebaseConfig";
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import Link from "next/link";
 import { MdEdit, MdLogout, MdEvent, MdMessage, MdStar, MdSettings } from "react-icons/md"; 
 import Head from "next/head";
@@ -11,6 +11,140 @@ import AuthGuard from './api/AuthGuard';
 import Layout from "../components/layout/Layout";
 import Sidebar from "../components/layout/Sidebar";
 import RightPanel from "../components/layout/RightPanel";
+
+function BecomeTeacher({ user, onSuccess }) {
+  const [showTeacherForm, setShowTeacherForm] = useState(false);
+  const [teacherPassword, setTeacherPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isTeacher, setIsTeacher] = useState(false);
+  
+  useEffect(() => {
+    const checkTeacherStatus = async () => {
+      if (!user) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().role === 'teacher') {
+          setIsTeacher(true);
+        }
+      } catch (error) {
+        console.error('Error checking teacher status:', error);
+      }
+    };
+    
+    checkTeacherStatus();
+  }, [user]);
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    
+    if (teacherPassword !== '1234') {
+      setError('Invalid teacher password');
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        role: 'teacher'
+      });
+      
+      setSuccess('Your account has been upgraded to teacher status!');
+      setTeacherPassword('');
+      setIsTeacher(true);
+      
+      if (onSuccess) onSuccess();
+      
+      setTimeout(() => {
+        setShowTeacherForm(false);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      setError('Failed to update your account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  if (isTeacher) {
+    return (
+      <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
+        <label className="block text-sm font-medium text-gray-500 mb-1">Teacher Status</label>
+        <div className="flex items-center">
+          <span className="px-2 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-md">
+            Teacher
+          </span>
+          <p className="ml-2 text-gray-600 text-sm">You have teacher privileges</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
+      <label className="block text-sm font-medium text-gray-500 mb-1">Teacher Status</label>
+      
+      {!showTeacherForm ? (
+        <button
+          onClick={() => setShowTeacherForm(true)}
+          className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
+        >
+          Become a Teacher
+        </button>
+      ) : (
+        <div className="mt-2">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <input
+                type="password"
+                value={teacherPassword}
+                onChange={(e) => setTeacherPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
+                placeholder="Enter teacher password"
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the teacher password to verify your teacher status.
+              </p>
+            </div>
+            
+            {error && (
+              <div className="text-red-600 text-sm">{error}</div>
+            )}
+            
+            {success && (
+              <div className="text-green-600 text-sm">{success}</div>
+            )}
+            
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowTeacherForm(false)}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 text-sm"
+              >
+                {loading ? 'Verifying...' : 'Verify'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Account() {
   const { user, logout } = useAuth(); 
@@ -70,7 +204,6 @@ export default function Account() {
     );
   }
 
-  // Main content component for the account page
   const AccountContent = () => (
     <div className="w-full max-w-6xl mx-auto">
       {error && (
@@ -79,7 +212,6 @@ export default function Account() {
         </div>
       )}
       
-      {/* Cleaner profile header with better responsive design */}
       <div className="relative mb-20 sm:mb-24">
         <div className="bg-gradient-to-r from-purple-800 via-purple-700 to-purple-600 rounded-xl h-36 sm:h-48 w-full shadow-md"></div>
         <div className="absolute transform -translate-y-1/2 left-1/2 -translate-x-1/2 sm:left-8 sm:translate-x-0 flex flex-col sm:flex-row items-center sm:items-end">
@@ -105,7 +237,6 @@ export default function Account() {
         </div>
       </div>
       
-      {/* Action buttons - repositioned for better flow */}
       <div className="flex flex-wrap gap-3 mb-8 justify-center sm:justify-end">
         <Link 
           href="/editAccount"
@@ -122,9 +253,7 @@ export default function Account() {
         </button>
       </div>
       
-      {/* Main content grid - improved for better content fit */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Account Details Card - Improved layout and spacing */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md">
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
@@ -167,17 +296,22 @@ export default function Account() {
                       : "Not available"}
                   </p>
                 </div>
+                
+                <BecomeTeacher 
+                  user={currentUser} 
+                  onSuccess={() => {
+                    window.location.reload();
+                  }} 
+                />
               </div>
             </div>
           </div>
           
-          {/* Activity Section - Enhanced visual design */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md">
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
               <h2 className="text-xl font-semibold text-gray-800">Recent Activity</h2>
             </div>
             <div className="p-6">
-              {/* You could add real activity items here */}
               <div className="text-center py-6 text-gray-500">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-50 rounded-full mb-4">
                   <MdEvent className="text-3xl text-purple-600" />
@@ -191,9 +325,7 @@ export default function Account() {
           </div>
         </div>
         
-        {/* Right column for stats and recommendations */}
         <div className="col-span-1 space-y-6">
-          {/* Stats Card - Improved visual styling */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md">
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
               <h2 className="text-xl font-semibold text-gray-800">Stats</h2>
@@ -233,14 +365,12 @@ export default function Account() {
             </div>
           </div>
           
-          {/* Recommendations Card - Enhanced with interactive styling */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md">
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
               <h2 className="text-xl font-semibold text-gray-800">Recommendations</h2>
             </div>
             <div className="p-5">
               <div className="space-y-4">
-                {/* Course recommendation */}
                 <div className="p-3 rounded-lg border border-gray-100 hover:bg-purple-50 transition-colors cursor-pointer">
                   <div className="flex items-center mb-2">
                     <div className="bg-purple-100 p-2 rounded-lg">
@@ -257,7 +387,6 @@ export default function Account() {
                   </div>
                 </div>
                 
-                {/* Event recommendation */}
                 <div className="p-3 rounded-lg border border-gray-100 hover:bg-purple-50 transition-colors cursor-pointer">
                   <div className="flex items-center mb-2">
                     <div className="bg-blue-100 p-2 rounded-lg">
@@ -274,7 +403,6 @@ export default function Account() {
                   </div>
                 </div>
                 
-                {/* Course recommendation */}
                 <div className="p-3 rounded-lg border border-gray-100 hover:bg-purple-50 transition-colors cursor-pointer">
                   <div className="flex items-center mb-2">
                     <div className="bg-yellow-100 p-2 rounded-lg">
