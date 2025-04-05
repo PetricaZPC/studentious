@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "./api/context/AuthContext";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "./api/config/firebaseConfig";
-import { doc, getDoc, updateDoc, query, collection, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import axios from 'axios';
 import Link from "next/link";
 import { MdEdit, MdLogout, MdEvent, MdMessage, MdStar, MdSettings } from "react-icons/md"; 
 import Head from "next/head";
@@ -171,17 +169,8 @@ export default function Account() {
       router.push('/login');
       return;
     }
-
-    const unsubscribe = onAuthStateChanged(auth, (updatedUser) => {
-      if (updatedUser) {
-        setCurrentUser(updatedUser);
-      } else {
-        router.push('/login');
-      }
-    });
-
-    return () => unsubscribe();
-  }, [user, router]);
+  
+  },[user]);
 
   useEffect(() => {
     if (user) {
