@@ -13,6 +13,7 @@ export default function VideoComponent({ roomId, onLeave }) {
   const [error, setError] = useState(null);
   const [participantCount, setParticipantCount] = useState(1);
   const [currentUser, setCurrentUser] = useState(null);
+  const [connectionState, setConnectionState] = useState('CONNECTING');
 
   const agoraClient = useRef(null);
   const localVideoRef = useRef(null);
@@ -20,14 +21,46 @@ export default function VideoComponent({ roomId, onLeave }) {
   useEffect(() => {
     const initializeAgora = async () => {
       try {
-        // Initialize Agora client
+        // Initialize Agora client with cloud proxy support
         agoraClient.current = AgoraRTC.createClient({ 
-          mode: 'rtc',
-          codec: 'vp8'
+          mode: 'rtc',  // Keep this as 'rtc' for peer-to-peer video chat
+          codec: 'vp8',
+          enableCloudProxy: true,
         });
 
-        // Get Agora token
-        const response = await fetch(`/api/agora/token?channelName=${roomId}`);
+        // Add connection state change listener
+        agoraClient.current.on('connection-state-change', (curState, prevState) => {
+          console.log(`Connection state changed from ${prevState} to ${curState}`);
+          setConnectionState(curState);
+        });
+
+        // Helper function to generate device fingerprint
+        const generateDeviceFingerprint = () => {
+          const nav = window.navigator;
+          const screen = window.screen;
+          let fingerprint = nav.userAgent + screen.width + screen.height + screen.colorDepth;
+          
+          // Add timestamp to ensure uniqueness
+          fingerprint += new Date().getTime();
+          
+          // Simple hash function
+          let hash = 0;
+          for (let i = 0; i < fingerprint.length; i++) {
+            hash = ((hash << 5) - hash) + fingerprint.charCodeAt(i);
+            hash |= 0; // Convert to 32bit integer
+          }
+          return Math.abs(hash).toString();
+        };
+
+        // Get Agora token with device fingerprint to ensure unique IDs
+        const deviceFingerprint = generateDeviceFingerprint();
+        const response = await fetch(`/api/agora/token?channelName=${roomId}&deviceId=${deviceFingerprint}`);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to get token');
+        }
+        
         const data = await response.json();
 
         console.log('Joining channel with UID:', data.uid, 'and name:', data.userName);
@@ -38,6 +71,9 @@ export default function VideoComponent({ roomId, onLeave }) {
           name: data.userName
         });
 
+        // Configure client before joining
+        await agoraClient.current.enableDualStream();
+
         // Join channel with the token
         await agoraClient.current.join(
           data.appId,
@@ -45,6 +81,20 @@ export default function VideoComponent({ roomId, onLeave }) {
           data.token,
           data.uid
         );
+
+        // Set up TURN server if provided
+        if (data.turnServer) {
+          try {
+            await agoraClient.current.setTurnServer([{
+              urls: [data.turnServer.url],
+              username: data.turnServer.username,
+              credential: data.turnServer.credential
+            }]);
+            console.log('TURN server configured');
+          } catch (err) {
+            console.warn('Failed to set TURN server:', err);
+          }
+        }
 
         // Set user attributes to share display name
         try {
@@ -55,8 +105,22 @@ export default function VideoComponent({ roomId, onLeave }) {
           console.warn('Failed to set user attributes:', err);
         }
 
-        // Create and publish tracks
-        const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
+        // Create and publish tracks with enhanced options
+        const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
+          {
+            AEC: true, // Echo cancellation
+            ANS: true, // Auto noise suppression
+            AGC: true, // Auto gain control
+          }, 
+          {
+            encoderConfig: 'standard',
+            facingMode: 'user'
+          }
+        );
+
+        // Prevent echo by setting local audio volume to 0
+        audioTrack.setVolume(0);
+        
         await agoraClient.current.publish([audioTrack, videoTrack]);
 
         setLocalAudioTrack(audioTrack);
@@ -181,6 +245,15 @@ export default function VideoComponent({ roomId, onLeave }) {
           </button>
         </div>
       </div>
+
+      {/* Connection State */}
+      {connectionState !== 'CONNECTED' && (
+        <div className="bg-yellow-100 text-yellow-800 p-2 text-sm text-center">
+          {connectionState === 'CONNECTING' && 'Connecting to video server...'}
+          {connectionState === 'DISCONNECTED' && 'Disconnected from video server. Trying to reconnect...'}
+          {connectionState === 'RECONNECTING' && 'Reconnecting to video server...'}
+        </div>
+      )}
 
       {/* Video Grid */}
       <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,6 +1,5 @@
 import clientPromise from '../auth/mongodb';
 import { RtcTokenBuilder, RtcRole } from 'agora-access-token';
-import { v4 as uuidv4 } from 'uuid';
 import { serialize } from 'cookie';
 
 export default async function handler(req, res) {
@@ -19,64 +18,65 @@ export default async function handler(req, res) {
   }
   
   try {
-    // Get channel name
-    const { channel } = req.query;
+    // Get channel name from the query
+    const { channelName, deviceId } = req.query;
     
-    if (!channel) {
+    if (!channelName) {
       return res.status(400).json({ message: "Channel name is required" });
     }
+
+    // Use device fingerprint to create a consistent ID for this user on this device
+    const userIdBase = deviceId || req.headers['user-agent'] || 'anonymous';
     
-    // Get or create a unique browser identity
-    let userId = req.cookies.chatUserId;
-    let userName = req.cookies.chatUserName;
-    
-    if (!userId) {
-      userId = `user-${uuidv4().substring(0, 8)}`;
-      userName = `User-${Math.floor(Math.random() * 10000)}`;
-      
-      // Set cookies to persist this identity
-      res.setHeader('Set-Cookie', [
-        `chatUserId=${userId}; Path=/; Max-Age=86400; SameSite=Lax`,
-        `chatUserName=${userName}; Path=/; Max-Age=86400; SameSite=Lax`
-      ]);
+    // Generate a numeric UID from the user ID
+    // Extract digits and ensure it's within 32-bit range
+    let uidStr = '';
+    for (let i = 0; i < userIdBase.length; i++) {
+      const code = userIdBase.charCodeAt(i);
+      uidStr += (code % 10).toString();
+      if (uidStr.length >= 8) break;
     }
     
-    // Configure Agora
-    const appId = process.env.AGORA_APP_ID;
+    // Ensure UID is a valid number and unique
+    const uid = parseInt(uidStr) || Math.floor(100000 + Math.random() * 900000);
+    
+    // Get credentials from environment variables
+    const appID = process.env.AGORA_APP_ID;
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
     
-    if (!appId || !appCertificate) {
+    if (!appID || !appCertificate) {
       return res.status(500).json({ message: "Agora credentials not configured" });
     }
     
-    // Create a numeric UID derived from user ID
-    // Extract numbers from userId and ensure uniqueness
-    const uidStr = userId.replace(/[^0-9]/g, '');
-    const uid = parseInt(uidStr.substring(0, 8) || Math.floor(Math.random() * 100000));
-    
+    // Set expiration time (1 hour)
     const expirationTimeInSeconds = 3600;
     const currentTimestamp = Math.floor(Date.now() / 1000);
     const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
-
-    // Generate the Agora token
+    
+    // Generate token
     const token = RtcTokenBuilder.buildTokenWithUid(
-      appId,
+      appID,
       appCertificate,
-      channel,
+      channelName,
       uid,
       RtcRole.PUBLISHER,
       privilegeExpiredTs
     );
-
+    
+    // Include TURN server info for NAT traversal
     return res.status(200).json({
-      appId,
+      appId: appID,
       token,
       uid,
-      channel,
-      userId,
-      userName,
-      timestamp: Date.now(),
-      environment: process.env.NODE_ENV
+      channel: channelName,
+      userId: userIdBase.substring(0, 8),
+      userName: `User-${uid.toString().substring(0, 4)}`,
+      turnServer: {
+        url: 'turn:global.turn.twilio.com:3478?transport=udp',
+        username: uid.toString(),
+        credential: token.substring(0, 16)
+      },
+      timestamp: Date.now()
     });
   } catch (error) {
     console.error("Error generating Agora token:", error);
