@@ -1,59 +1,55 @@
-import { auth, db } from "@/pages/api/config/firebaseConfig";
 import { useAuth } from "@/pages/api/context/AuthContext";
-import { doc, getDoc } from "firebase/firestore";
-import { useParams } from "next/navigation";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { usePathname } from 'next/navigation'
-import { isMatch } from "date-fns";
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 export default function Sidebar() {
-  const { user, getUserProfile } = useAuth(); // Access getUserProfile from AuthContext
-  const [currentUser, setCurrentUser] = useState(user);
+  const { user, getUserProfile } = useAuth();
+  const [currentUser, setCurrentUser] = useState(user || {});
   const [profileImage, setProfileImage] = useState(null);
+  
   const isDashboard = usePathname() === "/";
   const isCalendar = usePathname() === "/calendar";
   const isCourses = usePathname() === "/study";
   const isMessages = usePathname() === "/messages";
   const isResources = usePathname() === "/resources";
   const isAccount = usePathname() === "/account";
-  useEffect(() => {
-    if (user) {
-      const fetchProfileImage = async () => {
-        try {
-          const docRef = doc(db, 'userProfiles', user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists() && docSnap.data().photoURL) {
-            setProfileImage(docSnap.data().photoURL);
-          }
-        } catch (error) {
-          console.error('Error fetching profile image:', error);
-        }
-      };
-      fetchProfileImage();
-    }
-  }, [user]);
 
   useEffect(() => {
-    // Fetch user profile when the component mounts
-    getUserProfile().then((data) => {
-      setCurrentUser(data);
-    });
-  }, [getUserProfile]);
+    // Fetch complete user profile data from MongoDB through the API
+    if (user) {
+      const loadUserProfile = async () => {
+        try {
+          const profileData = await getUserProfile();
+          if (profileData) {
+            setCurrentUser(profileData);
+            if (profileData.photoURL) {
+              setProfileImage(profileData.photoURL);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        }
+      };
+      
+      loadUserProfile();
+    }
+  }, [user, getUserProfile]);
 
   return (
     <nav className="w-64 fixed left-0 top-0 h-full bg-white p-6 border-r border-gray-200 shadow-sm flex flex-col">
       {/* Logo with text */}
       <div className="flex items-center justify-center mb-8">
-        <div className="h-10 w-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-          <span className="text-white font-bold text-lg">S</span>
+        <div className="h-10 w-10 flex items-center justify-center mr-3">
+          <img src="/favicon.ico" alt="Logo" className="h-8 w-8" />
         </div>
         <span className="text-xl font-semibold text-gray-800">Studentious</span>
       </div>
 
       {/* Navigation Links */}
       <ul className="space-y-2 flex-1">
-      <NavItem
+        <NavItem
           icon={
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -66,7 +62,7 @@ export default function Sidebar() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-               d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
               />
             </svg>
           }
@@ -182,7 +178,7 @@ export default function Sidebar() {
           )}
           <a href="/account">
             <div>
-              <p className="text-sm font-medium text-gray-700">{currentUser.fullName}</p>
+              <p className="text-sm font-medium text-gray-700">{currentUser?.fullName || currentUser?.email || 'User'}</p>
             </div>
           </a>
         </div>
