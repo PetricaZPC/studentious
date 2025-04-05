@@ -235,6 +235,46 @@ function CalendarLegend({ teachers }) {
   );
 }
 
+function AdminPanel() {
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+          setIsAdmin(true);
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [user]);
+
+  if (!user || !isAdmin) {
+    return (
+      <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+        <h3 className="text-md font-semibold text-gray-800 mb-3">Admin Authentication</h3>
+        {!isAdmin && (
+          <p className="text-red-500 mb-4">You need admin privileges to access this panel.</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+      <h3 className="text-md font-semibold text-gray-800 mb-3">Admin Panel</h3>
+      <p>Welcome, Admin!</p>
+    </div>
+  );
+}
+
 export default function CalendarPage() {
     const { user } = useAuth();
     const router = useRouter();
@@ -504,6 +544,24 @@ export default function CalendarPage() {
         fetchNotifications();
         const interval = setInterval(fetchNotifications, 30000);
         return () => clearInterval(interval);
+      }
+    }, [user]);
+
+    const makeUserTeacher = async (userId) => {
+      try {
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+          role: 'teacher'
+        });
+        alert('User is now a teacher');
+      } catch (error) {
+        console.error('Error updating user role:', error);
+      }
+    };
+
+    useEffect(() => {
+      if (user) {
+        makeUserTeacher(user.uid);
       }
     }, [user]);
 
@@ -887,7 +945,7 @@ return (
         </div>
       </main>
     </div>
-   
+    <AdminPanel />
   </AuthGuard>
 )
 }
