@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "./api/context/AuthContext";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./api/config/firebaseConfig";
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, query, collection, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import Link from "next/link";
 import { MdEdit, MdLogout, MdEvent, MdMessage, MdStar, MdSettings } from "react-icons/md"; 
 import Head from "next/head";
@@ -152,6 +152,8 @@ export default function Account() {
   const [error, setError] = useState("");
   const [profileImage, setProfileImage] = useState(null);
   const [eventsJoined, setEventsJoined] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
 
   const router = useRouter();
 
@@ -211,6 +213,46 @@ export default function Account() {
       fetchEvents();
     }
   }, [user, getEvents]);
+
+  const fetchRecentActivities = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingActivities(true);
+      
+      // Get user's joined events
+      const eventsQuery = query(
+        collection(db, 'events'),
+        where('participants', 'array-contains', user.uid),
+        orderBy('createdAt', 'desc'),
+        limit(5)
+      );
+      
+      const eventsSnapshot = await getDocs(eventsQuery);
+      const activities = eventsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        type: 'event',
+        title: doc.data().title,
+        description: doc.data().description,
+        date: doc.data().date,
+        time: doc.data().time,
+        timestamp: doc.data().createdAt,
+        isCreator: doc.data().creatorId === user.uid
+      }));
+  
+      setRecentActivities(activities);
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+    } finally {
+      setLoadingActivities(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchRecentActivities();
+    }
+  }, [user]);
 
   if (!currentUser) {
     return (
@@ -328,15 +370,57 @@ export default function Account() {
               <h2 className="text-xl font-semibold text-gray-800">Recent Activity</h2>
             </div>
             <div className="p-6">
-              <div className="text-center py-6 text-gray-500">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-50 rounded-full mb-4">
-                  <MdEvent className="text-3xl text-purple-600" />
+              {loadingActivities ? (
+                <div className="text-center py-6">
+                  <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Loading activities...</p>
                 </div>
-                <p className="text-gray-600">Your recent activity will appear here.</p>
-                <Link href="/calendar" className="mt-3 inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">
-                  <MdEvent className="mr-1.5" /> Browse Events
-                </Link>
-              </div>
+              ) : recentActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {recentActivities.map((activity) => (
+                    <div key={activity.id} className="p-3 rounded-lg border border-gray-100 hover:bg-purple-50 transition-colors">
+                      <div className="flex items-center mb-2">
+                        <div className="bg-purple-100 p-2 rounded-lg">
+                          <MdEvent className="text-xl text-purple-600" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="font-medium text-gray-800">{activity.title}</p>
+                          <p className="text-xs text-gray-500">
+                            {activity.isCreator ? 'Created' : 'Joined'} on {new Date(activity.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      {activity.description && (
+                        <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
+                      )}
+                      <div className="mt-2 flex justify-between items-center">
+                        <span className="text-xs text-gray-500">
+                          {activity.time}
+                        </span>
+                        <Link 
+                          href={`/calendar?event=${activity.id}`}
+                          className="text-xs text-purple-600 hover:text-purple-800"
+                        >
+                          View details
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-50 rounded-full mb-4">
+                    <MdEvent className="text-3xl text-purple-600" />
+                  </div>
+                  <p className="text-gray-600">No recent activity to show.</p>
+                  <Link 
+                    href="/calendar" 
+                    className="mt-3 inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                  >
+                    <MdEvent className="mr-1.5" /> Browse Events
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -247,6 +247,9 @@ export default function CalendarPage() {
     const [isUserTeacher, setIsUserTeacher] = useState(false);
   
     const [eventTitle, setEventTitle] = useState('');
+    const [eventLocation, setEventLocation] = useState('');
+    const [eventStartTime, setEventStartTime] = useState('');
+    
     const [eventDescription, setEventDescription] = useState('');
     const [eventTime, setEventTime] = useState('');
     const [maxParticipants, setMaxParticipants] = useState(1);
@@ -290,7 +293,9 @@ export default function CalendarPage() {
           creatorName: user.displayName || 'Anonymous',
           creatorEmail: user.email || 'unknown@email.com',
           creatorRole: userRole, // Use the determined role
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          startTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
+          endTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
         });
         
         const usersQuery = query(collection(db, 'users'));
@@ -310,7 +315,9 @@ export default function CalendarPage() {
                 title: eventTitle,
                 description: eventDescription,
                 date: format(selectedDate, 'yyyy-MM-dd'),
-                time: eventTime
+                time: eventTime,
+                startTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
+                endTime: format(selectedDate, 'yyyy-MM-dd') + 'T' + eventTime,
               },
               read: false,
               createdAt: serverTimestamp()
@@ -445,6 +452,8 @@ export default function CalendarPage() {
       setIsTeacherMode(isUserTeacher);
       setTeacherPassword('');
       setPasswordError('');
+      setEventStartTime(format(new Date(), 'yyyy-MM-dd, HH:mm'));
+      setEventEndTime(format(new Date(), 'yyyy-MM-dd, HH:mm'));
     };
 
     useEffect(() => {
@@ -614,13 +623,36 @@ return (
                           <input
                             type="time"
                             value={eventTime}
-                            onChange={(e) => setEventTime(e.target.value)}
+                            onChange={(e) => {setEventTime(e.target.value)
+                                setEventStartTime(format(selectedDate, 'yyyy-MM-dd') + 'T' + e.target.value)
+                            }}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                             required
                           />
                         </div>
-
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Location</label>
+                            <input
+                              type="text"
+                              value={eventLocation}
+                              onChange={(e) => setEventLocation(e.target.value)}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              required
+                              ></input>
+                          </div>
                         <div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">End time</label>
+                            <input 
+                              type="time"
+                              value={eventEndTime}
+                              onChange={(e) => {setEventEndTime(e.target.value)
+                                  setEventEndTime(format(selectedDate, 'yyyy-MM-dd') + 'T' + e.target.value)
+                              }}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              required
+                            />
+                          </div>
                           <label className="block text-sm font-medium text-gray-700">Max Participants</label>
                           <input
                             type="number"
@@ -819,7 +851,11 @@ return (
                     const isFull = event.currentParticipants >= event.maxParticipants;
 
                     return (
-                      <li key={event.id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
+                      <a 
+                        href={`/events/${event.id}`}
+                        className='block bg-white rounded-lg shadow-sm hover:shadow-md transition'
+                        >
+                        <li key={event.id} className="flex items-center px-4 py-2 space-x-4 group rounded-xl focus-within:bg-gray-100 hover:bg-gray-100">
                         <div className={`w-3 h-3 ${userColor} rounded-full flex-shrink-0`}></div>
                         
                         <div className="flex-auto">
@@ -861,6 +897,7 @@ return (
                           )}
                         </div>
                       </li>
+                      </a>
                     );
                   })}
               </ol>
@@ -884,3 +921,228 @@ const colStartClasses = [
   'col-start-6',
   'col-start-7',
 ]
+
+import React, { useEffect, useState } from "react";
+import { useAuth } from "./api/context/AuthContext";
+import Link from "next/link";
+import { MdEdit, MdLogout, MdEvent, MdMessage, MdStar } from "react-icons/md";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import AuthGuard from "./api/AuthGuard";
+import Layout from "../components/layout/Layout";
+import Sidebar from "../components/layout/Sidebar";
+
+function BecomeTeacher({ user, onSuccess }) {
+  const [showTeacherForm, setShowTeacherForm] = useState(false);
+  const [teacherPassword, setTeacherPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isTeacher, setIsTeacher] = useState(false);
+
+  useEffect(() => {
+    const checkTeacherStatus = async () => {
+      if (!user) return;
+
+      try {
+        const response = await fetch(`/api/users/${user.id}`);
+        const data = await response.json();
+        if (data.role === "teacher") {
+          setIsTeacher(true);
+        }
+      } catch (error) {
+        console.error("Error checking teacher status:", error);
+      }
+    };
+
+    checkTeacherStatus();
+  }, [user]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    if (teacherPassword !== "1234") {
+      setError("Invalid teacher password");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role: "teacher" }),
+      });
+
+      if (response.ok) {
+        setSuccess("Your account has been upgraded to teacher status!");
+        setTeacherPassword("");
+        setIsTeacher(true);
+
+        if (onSuccess) onSuccess();
+
+        setTimeout(() => {
+          setShowTeacherForm(false);
+        }, 2000);
+      } else {
+        setError("Failed to update your account. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      setError("Failed to update your account. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (isTeacher) {
+    return (
+      <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
+        <label className="block text-sm font-medium text-gray-500 mb-1">Teacher Status</label>
+        <div className="flex items-center">
+          <span className="px-2 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-md">
+            Teacher
+          </span>
+          <p className="ml-2 text-gray-600 text-sm">You have teacher privileges</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
+      <label className="block text-sm font-medium text-gray-500 mb-1">Teacher Status</label>
+
+      {!showTeacherForm ? (
+        <button
+          onClick={() => setShowTeacherForm(true)}
+          className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
+        >
+          Become a Teacher
+        </button>
+      ) : (
+        <div className="mt-2">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <input
+                type="password"
+                value={teacherPassword}
+                onChange={(e) => setTeacherPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
+                placeholder="Enter teacher password"
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the teacher password to verify your teacher status.
+              </p>
+            </div>
+
+            {error && <div className="text-red-600 text-sm">{error}</div>}
+
+            {success && <div className="text-green-600 text-sm">{success}</div>}
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowTeacherForm(false)}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 text-sm"
+              >
+                {loading ? "Verifying..." : "Verify"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Account() {
+  const { user, logout } = useAuth();
+  const [currentUser, setCurrentUser] = useState(user);
+  const [error, setError] = useState("");
+  const [profileImage, setProfileImage] = useState(null);
+  const [eventsJoined, setEventsJoined] = useState([]);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push("/login");
+    } catch (error) {
+      setError("Failed to log out");
+    }
+  };
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch(`/api/users/${user.id}`);
+        const data = await response.json();
+        setCurrentUser(data);
+        setProfileImage(data.photoURL);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    fetchUserData();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch(`/api/events?userId=${user.id}`);
+        const data = await response.json();
+        setEventsJoined(data);
+      } catch (error) {
+        console.error("Error fetching events:", error);
+      }
+    };
+
+    if (user) {
+      fetchEvents();
+    }
+  }, [user]);
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <AuthGuard>
+      <Head>
+        <title>Account | Studentious</title>
+        <meta name="description" content="Manage your account settings" />
+      </Head>
+
+      <Layout>
+        <Sidebar />
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-50">
+          {/* Account content here */}
+        </div>
+      </Layout>
+    </AuthGuard>
+  );
+}
