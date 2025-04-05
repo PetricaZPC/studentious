@@ -18,6 +18,14 @@ export default function VideoComponent({ roomId, onLeave }) {
   const agoraClient = useRef(null);
   const localVideoRef = useRef(null);
 
+  // Helper function to update participant count
+  const updateParticipantCount = () => {
+    // Need to manually count since remoteUsers state might not be updated yet
+    const count = 1 + Object.keys(agoraClient.current.remoteUsers).length;
+    console.log(`Updating participant count to ${count} (remote users: ${JSON.stringify(Object.keys(agoraClient.current.remoteUsers))})`);
+    setParticipantCount(count);
+  };
+
   useEffect(() => {
     const initializeAgora = async () => {
       try {
@@ -34,104 +42,7 @@ export default function VideoComponent({ roomId, onLeave }) {
           setConnectionState(curState);
         });
 
-        // Helper function to generate device fingerprint
-        const generateDeviceFingerprint = () => {
-          const nav = window.navigator;
-          const screen = window.screen;
-          let fingerprint = nav.userAgent + screen.width + screen.height + screen.colorDepth;
-          
-          // Add timestamp to ensure uniqueness
-          fingerprint += new Date().getTime();
-          
-          // Simple hash function
-          let hash = 0;
-          for (let i = 0; i < fingerprint.length; i++) {
-            hash = ((hash << 5) - hash) + fingerprint.charCodeAt(i);
-            hash |= 0; // Convert to 32bit integer
-          }
-          return Math.abs(hash).toString();
-        };
-
-        // Get Agora token with device fingerprint to ensure unique IDs
-        const deviceFingerprint = generateDeviceFingerprint();
-        const response = await fetch(`/api/agora/token?channelName=${roomId}&deviceId=${deviceFingerprint}`);
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to get token');
-        }
-        
-        const data = await response.json();
-
-        console.log('Joining channel with UID:', data.uid, 'and name:', data.userName);
-
-        // Set current user info 
-        setCurrentUser({
-          uid: data.uid,
-          name: data.userName
-        });
-
-        // Configure client before joining
-        await agoraClient.current.enableDualStream();
-
-        // Join channel with the token
-        await agoraClient.current.join(
-          data.appId,
-          data.channel,
-          data.token,
-          data.uid
-        );
-
-        // Set up TURN server if provided
-        if (data.turnServer) {
-          try {
-            await agoraClient.current.setTurnServer([{
-              urls: [data.turnServer.url],
-              username: data.turnServer.username,
-              credential: data.turnServer.credential
-            }]);
-            console.log('TURN server configured');
-          } catch (err) {
-            console.warn('Failed to set TURN server:', err);
-          }
-        }
-
-        // Set user attributes to share display name
-        try {
-          await agoraClient.current.setLocalUserAttributes({
-            name: data.userName
-          });
-        } catch (err) {
-          console.warn('Failed to set user attributes:', err);
-        }
-
-        // Create and publish tracks with enhanced options
-        const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
-          {
-            AEC: true, // Echo cancellation
-            ANS: true, // Auto noise suppression
-            AGC: true, // Auto gain control
-          }, 
-          {
-            encoderConfig: 'standard',
-            facingMode: 'user'
-          }
-        );
-
-        // Prevent echo by setting local audio volume to 0
-        audioTrack.setVolume(0);
-        
-        await agoraClient.current.publish([audioTrack, videoTrack]);
-
-        setLocalAudioTrack(audioTrack);
-        setLocalVideoTrack(videoTrack);
-        
-        // Play local video
-        if (localVideoRef.current) {
-          videoTrack.play(localVideoRef.current);
-        }
-
-        // Add user-joined listener
+        // Add user-joined listener BEFORE joining
         agoraClient.current.on('user-joined', async (user) => {
           console.log(`User ${user.uid} joined the channel`);
           
@@ -150,15 +61,7 @@ export default function VideoComponent({ roomId, onLeave }) {
           updateParticipantCount();
         });
 
-        // Add helper function to update participant count
-        const updateParticipantCount = () => {
-          // Need to manually count since remoteUsers state might not be updated yet
-          const count = 1 + Object.keys(agoraClient.current.remoteUsers).length;
-          console.log(`Updating participant count to ${count}`);
-          setParticipantCount(count);
-        };
-
-        // Handle remote users
+        // Add user-published handler BEFORE joining
         const handleUserPublished = async (user, mediaType) => {
           await agoraClient.current.subscribe(user, mediaType);
           console.log(`Remote user ${user.uid} published ${mediaType}`);
@@ -217,7 +120,7 @@ export default function VideoComponent({ roomId, onLeave }) {
 
         agoraClient.current.on('user-published', handleUserPublished);
 
-        // Replace the existing user-left handler
+        // Add user-left handler BEFORE joining
         agoraClient.current.on('user-left', (user) => {
           console.log(`User ${user.uid} left the channel`);
           
@@ -227,9 +130,142 @@ export default function VideoComponent({ roomId, onLeave }) {
             return next;
           });
           
-          // Use the helper function
+          // Update participant count
           updateParticipantCount();
         });
+
+        // Helper function to generate device fingerprint
+        const generateDeviceFingerprint = () => {
+          const nav = window.navigator;
+          const screen = window.screen;
+          let fingerprint = nav.userAgent + screen.width + screen.height + screen.colorDepth;
+          
+          // Add timestamp to ensure uniqueness
+          fingerprint += new Date().getTime();
+          
+          // Simple hash function
+          let hash = 0;
+          for (let i = 0; i < fingerprint.length; i++) {
+            hash = ((hash << 5) - hash) + fingerprint.charCodeAt(i);
+            hash |= 0; // Convert to 32bit integer
+          }
+          return Math.abs(hash).toString();
+        };
+
+        // Get Agora token with device fingerprint to ensure unique IDs
+        const deviceFingerprint = generateDeviceFingerprint();
+        const response = await fetch(`/api/agora/token?channelName=${roomId}&deviceId=${deviceFingerprint}`);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to get token');
+        }
+        
+        const data = await response.json();
+
+        console.log('Joining channel with UID:', data.uid, 'and name:', data.userName);
+
+        // Set current user info 
+        setCurrentUser({
+          uid: data.uid,
+          name: data.userName
+        });
+
+        // Configure client before joining
+        await agoraClient.current.enableDualStream();
+
+        // Join channel with the token
+        await agoraClient.current.join(
+          data.appId,
+          data.channel,
+          data.token,
+          data.uid
+        );
+
+        // IMPORTANT: Add this to detect users already in the channel
+        console.log("Checking for existing users in channel...");
+        // Get existing users in the channel
+        const remoteUsersInChannel = agoraClient.current.remoteUsers;
+        console.log(`Found ${remoteUsersInChannel.length} existing users in channel`);
+
+        // Process any users already in the channel
+        if (remoteUsersInChannel.length > 0) {
+          for (const remoteUser of remoteUsersInChannel) {
+            console.log(`Processing existing user: ${remoteUser.uid}`);
+            // Add to remoteUsers state
+            setRemoteUsers(prev => ({
+              ...prev,
+              [remoteUser.uid]: { 
+                uid: remoteUser.uid,
+                name: `User-${remoteUser.uid}`,
+                hasJoined: true
+              }
+            }));
+            
+            // Subscribe to their media
+            if (remoteUser.hasVideo) {
+              await agoraClient.current.subscribe(remoteUser, 'video');
+              console.log(`Subscribed to existing user's video: ${remoteUser.uid}`);
+            }
+            
+            if (remoteUser.hasAudio) {
+              await agoraClient.current.subscribe(remoteUser, 'audio');
+              console.log(`Subscribed to existing user's audio: ${remoteUser.uid}`);
+            }
+          }
+          
+          // Update participant count to include existing users
+          updateParticipantCount();
+        }
+
+        // Set up TURN server if provided
+        if (data.turnServer) {
+          try {
+            await agoraClient.current.setTurnServer([{
+              urls: [data.turnServer.url],
+              username: data.turnServer.username,
+              credential: data.turnServer.credential
+            }]);
+            console.log('TURN server configured');
+          } catch (err) {
+            console.warn('Failed to set TURN server:', err);
+          }
+        }
+
+        // Set user attributes to share display name
+        try {
+          await agoraClient.current.setLocalUserAttributes({
+            name: data.userName
+          });
+        } catch (err) {
+          console.warn('Failed to set user attributes:', err);
+        }
+
+        // Create and publish tracks with enhanced options
+        const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
+          {
+            AEC: true, // Echo cancellation
+            ANS: true, // Auto noise suppression
+            AGC: true, // Auto gain control
+          }, 
+          {
+            encoderConfig: 'standard',
+            facingMode: 'user'
+          }
+        );
+
+        // Prevent echo by setting local audio volume to 0
+        audioTrack.setVolume(0);
+        
+        await agoraClient.current.publish([audioTrack, videoTrack]);
+
+        setLocalAudioTrack(audioTrack);
+        setLocalVideoTrack(videoTrack);
+        
+        // Play local video
+        if (localVideoRef.current) {
+          videoTrack.play(localVideoRef.current);
+        }
 
         setLoading(false);
       } catch (err) {

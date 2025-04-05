@@ -28,23 +28,20 @@ export default async function handler(req, res) {
     // Generate a unique UID for this user
     // Make the uid calculation more random but still numeric
     const generateNumericUid = (deviceId) => {
-      const timestamp = Date.now().toString().slice(-6);
-      const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      let hash = 0;
-      
-      // If we have a deviceId, incorporate it
+      // For consistent user IDs across sessions on the same device
       if (deviceId) {
+        // Use only the deviceId for hashing to keep the same ID across sessions
+        let hash = 0;
         for (let i = 0; i < deviceId.length; i++) {
           hash = ((hash << 5) - hash) + deviceId.charCodeAt(i);
-          hash |= 0; // Convert to 32bit integer
+          hash |= 0;
         }
-        hash = Math.abs(hash) % 1000000; // Keep it under 7 digits
+        // Important: Make sure this is a positive 7-digit number
+        return (Math.abs(hash) % 9000000) + 1000000;
       } else {
-        hash = Math.floor(Math.random() * 1000000);
+        // Add current timestamp to avoid collisions between different users
+        return Math.floor(1000000 + Math.random() * 9000000);
       }
-      
-      // Use only the last few digits to create a small number
-      return parseInt(`${hash}${randomPart.slice(-2)}`.slice(-7));
     };
 
     const uid = generateNumericUid(deviceId);
