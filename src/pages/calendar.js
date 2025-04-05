@@ -189,26 +189,47 @@ function Meeting({ meeting }) {
 
 function CalendarLegend({ teachers }) {
   return (
-    <div className="mt-6 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-      <h3 className="text-sm font-medium text-gray-700 mb-2">Event Creator Legend</h3>
-      <div className="space-y-2">
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
-          <span className="text-sm text-gray-600">Student</span>
+    <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+      <h3 className="text-md font-semibold text-gray-800 mb-3">Event Creator Legend</h3>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {/* Student entry */}
+        <div className="flex items-center p-2 rounded-md hover:bg-gray-50">
+          <div className="w-4 h-4 bg-gray-400 rounded-full mr-3"></div>
+          <div>
+            <p className="text-sm font-medium text-gray-700">Students</p>
+            <p className="text-xs text-gray-500">All student-created events</p>
+          </div>
         </div>
         
+        {/* Teacher entries */}
         {teachers && teachers.length > 0 ? (
           teachers.map((teacher, index) => (
-            <div key={index} className="flex items-center">
-              <div className={`w-3 h-3 ${getUserColor(teacher.email, true)} rounded-full mr-2`}></div>
-              <span className="text-sm text-gray-600">
-                {teacher.name || teacher.email.split('@')[0]}
-              </span>
+            <div key={teacher.id || index} className="flex items-center p-2 rounded-md hover:bg-gray-50">
+              <div 
+                className={`w-4 h-4 ${getUserColor(teacher.email, true)} rounded-full mr-3`}
+              ></div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">{teacher.name}</p>
+                <p className="text-xs text-gray-500 truncate" title={teacher.email}>
+                  {teacher.email}
+                </p>
+              </div>
             </div>
           ))
         ) : (
-          <div className="text-sm text-gray-500">No teachers found</div>
+          <div className="flex items-center p-2">
+            <p className="text-sm text-gray-500 italic">No teachers found</p>
+          </div>
         )}
+      </div>
+      
+      {/* Help text */}
+      <div className="mt-3 pt-3 border-t border-gray-100">
+        <p className="text-xs text-gray-500">
+          Event colors indicate who created the event. Students' events are shown in gray, 
+          while teachers have unique colors to easily identify their events.
+        </p>
       </div>
     </div>
   );
@@ -505,6 +526,14 @@ export default function CalendarPage() {
       let firstDayNextMonth = add(firstDayCurrentMonth, { months: 1 })
       setCurrentMonth(format(firstDayNextMonth, 'MMM-yyyy'))
     }
+    
+    // Add this before the CalendarLegend in your return statement
+    // Only for development/testing
+    const dummyTeachers = [
+      { id: 'dummy1', email: 'teacher1@example.com', name: 'Teacher One' },
+      { id: 'dummy2', email: 'teacher2@example.com', name: 'Teacher Two' },
+      { id: 'dummy3', email: 'teacher3@example.com', name: 'Teacher Three' }
+    ];
     
 return (
   <AuthGuard>
@@ -854,7 +883,7 @@ return (
               </ol>
             </section>
           </div>
-          <CalendarLegend teachers={teachers} />
+          <CalendarLegend teachers={teachers.length > 0 ? teachers : dummyTeachers} />
         </div>
       </main>
     </div>
