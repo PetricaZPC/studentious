@@ -2,11 +2,8 @@ import Layout from '../components/layout/Layout';
 import Sidebar from '../components/layout/Sidebar';
 import DashboardContent from '../components/layout/DashboardContent';
 import AuthGuard from './api/AuthGuard';
-<<<<<<< HEAD
-import { useState, useEffect } from 'react';
-=======
-
->>>>>>> 66a1d9f5529ed3d01ed3def56943a028fc3be26a
+import { useAuth } from './api/context/AuthContext';
+import { useEffect, useState } from 'react';
 export default function Home() {
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
@@ -36,15 +33,9 @@ export default function Home() {
   return (
     <AuthGuard>
       <Layout>
-<<<<<<< HEAD
-      <Sidebar />
-      <MainContent />
-    </Layout>
-=======
         <Sidebar />
         <DashboardContent />
       </Layout>
->>>>>>> 66a1d9f5529ed3d01ed3def56943a028fc3be26a
     </AuthGuard>
   );
 }

@@ -921,3 +921,228 @@ const colStartClasses = [
   'col-start-6',
   'col-start-7',
 ]
+
+import React, { useEffect, useState } from "react";
+import { useAuth } from "./api/context/AuthContext";
+import Link from "next/link";
+import { MdEdit, MdLogout, MdEvent, MdMessage, MdStar } from "react-icons/md";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import AuthGuard from "./api/AuthGuard";
+import Layout from "../components/layout/Layout";
+import Sidebar from "../components/layout/Sidebar";
+
+function BecomeTeacher({ user, onSuccess }) {
+  const [showTeacherForm, setShowTeacherForm] = useState(false);
+  const [teacherPassword, setTeacherPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isTeacher, setIsTeacher] = useState(false);
+
+  useEffect(() => {
+    const checkTeacherStatus = async () => {
+      if (!user) return;
+
+      try {
+        const response = await fetch(`/api/users/${user.id}`);
+        const data = await response.json();
+        if (data.role === "teacher") {
+          setIsTeacher(true);
+        }
+      } catch (error) {
+        console.error("Error checking teacher status:", error);
+      }
+    };
+
+    checkTeacherStatus();
+  }, [user]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    if (teacherPassword !== "1234") {
+      setError("Invalid teacher password");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role: "teacher" }),
+      });
+
+      if (response.ok) {
+        setSuccess("Your account has been upgraded to teacher status!");
+        setTeacherPassword("");
+        setIsTeacher(true);
+
+        if (onSuccess) onSuccess();
+
+        setTimeout(() => {
+          setShowTeacherForm(false);
+        }, 2000);
+      } else {
+        setError("Failed to update your account. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      setError("Failed to update your account. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (isTeacher) {
+    return (
+      <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
+        <label className="block text-sm font-medium text-gray-500 mb-1">Teacher Status</label>
+        <div className="flex items-center">
+          <span className="px-2 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-md">
+            Teacher
+          </span>
+          <p className="ml-2 text-gray-600 text-sm">You have teacher privileges</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
+      <label className="block text-sm font-medium text-gray-500 mb-1">Teacher Status</label>
+
+      {!showTeacherForm ? (
+        <button
+          onClick={() => setShowTeacherForm(true)}
+          className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
+        >
+          Become a Teacher
+        </button>
+      ) : (
+        <div className="mt-2">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <input
+                type="password"
+                value={teacherPassword}
+                onChange={(e) => setTeacherPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
+                placeholder="Enter teacher password"
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the teacher password to verify your teacher status.
+              </p>
+            </div>
+
+            {error && <div className="text-red-600 text-sm">{error}</div>}
+
+            {success && <div className="text-green-600 text-sm">{success}</div>}
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowTeacherForm(false)}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 text-sm"
+              >
+                {loading ? "Verifying..." : "Verify"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Account() {
+  const { user, logout } = useAuth();
+  const [currentUser, setCurrentUser] = useState(user);
+  const [error, setError] = useState("");
+  const [profileImage, setProfileImage] = useState(null);
+  const [eventsJoined, setEventsJoined] = useState([]);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push("/login");
+    } catch (error) {
+      setError("Failed to log out");
+    }
+  };
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch(`/api/users/${user.id}`);
+        const data = await response.json();
+        setCurrentUser(data);
+        setProfileImage(data.photoURL);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    fetchUserData();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch(`/api/events?userId=${user.id}`);
+        const data = await response.json();
+        setEventsJoined(data);
+      } catch (error) {
+        console.error("Error fetching events:", error);
+      }
+    };
+
+    if (user) {
+      fetchEvents();
+    }
+  }, [user]);
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <AuthGuard>
+      <Head>
+        <title>Account | Studentious</title>
+        <meta name="description" content="Manage your account settings" />
+      </Head>
+
+      <Layout>
+        <Sidebar />
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-50">
+          {/* Account content here */}
+        </div>
+      </Layout>
+    </AuthGuard>
+  );
+}

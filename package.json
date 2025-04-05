@@ -24,6 +24,7 @@
     "date-fns": "^2.30.0",
     "firebase": "^11.6.0",
     "firebase-admin": "^13.2.0",
+    "formidable": "^3.5.2",
     "js-cookie": "^3.0.5",
     "mammoth": "^1.9.0",
     "mongodb": "^6.15.0",
