@@ -14,6 +14,7 @@ export default function VideoComponent({ roomId, onLeave }) {
   const [participantCount, setParticipantCount] = useState(1);
   const [currentUser, setCurrentUser] = useState(null);
   const [connectionState, setConnectionState] = useState('CONNECTING');
+  const [micActivity, setMicActivity] = useState(0);
 
   const agoraClient = useRef(null);
   const localVideoRef = useRef(null);
@@ -278,15 +279,28 @@ export default function VideoComponent({ roomId, onLeave }) {
 
         // Replace the current audio track creation with this more robust approach:
         try {
-          // Create audio track separately with simpler settings
-          console.log('Creating audio track with simplified settings...');
+          // Create audio track separately with refined settings
+          console.log('Creating audio track with enhanced settings...');
           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-            encoderConfig: 'music_standard',  // Use music_standard for better quality
-            AEC: true, 
+            encoderConfig: {
+              sampleRate: 48000,
+              stereo: false,
+              bitrate: 128
+            },
+            AEC: false,
             ANS: true,
             AGC: true
           });
-          
+
+          // Force re-permission for microphone access
+          try {
+            console.log('Requesting explicit microphone permission...');
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log('Microphone permission granted');
+          } catch (permError) {
+            console.error('Microphone permission error:', permError);
+          }
+
           // Create video track separately
           console.log('Creating video track...');
           const videoTrack = await AgoraRTC.createCameraVideoTrack({
@@ -335,16 +349,68 @@ export default function VideoComponent({ roomId, onLeave }) {
           }
           
           // Add a debug log for audio levels
-          setInterval(() => {
-            if (audioTrack && !isAudioMuted) {
-              const audioLevel = audioTrack.getVolumeLevel();
-              console.log(`Local audio level: ${audioLevel}`);
-              // If audio level is consistently 0, there might be a mic issue
-              if (audioLevel === 0) {
-                console.warn("Audio level is 0 - microphone might not be working");
-              }
+          const createVolumeMeter = (mediaStreamTrack) => {
+            try {
+              // Create an audio context
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              
+              // Create a MediaStreamSource from the audio track
+              const stream = new MediaStream([mediaStreamTrack._originMediaStreamTrack]);
+              const source = audioContext.createMediaStreamSource(stream);
+              
+              // Create an analyser node
+              const analyser = audioContext.createAnalyser();
+              analyser.fftSize = 256;
+              source.connect(analyser);
+              
+              // Buffer to receive frequency data
+              const dataArray = new Uint8Array(analyser.frequencyBinCount);
+              
+              // Create interval to monitor audio levels
+              const volumeInterval = setInterval(() => {
+                if (isAudioMuted) {
+                  setMicActivity(0);
+                  return;
+                }
+                
+                // Get the frequency data
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Calculate average volume level
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                  sum += dataArray[i];
+                }
+                const average = sum / dataArray.length;
+                
+                // Update state with the new level (scale to 0-100)
+                const scaledLevel = Math.min(100, Math.round(average * 2));
+                setMicActivity(scaledLevel);
+                
+                // Log microphone activity
+                if (scaledLevel === 0) {
+                  console.warn("No microphone activity detected");
+                } else {
+                  console.log(`Microphone activity: ${scaledLevel}%`);
+                }
+              }, 500);
+              
+              // Return cleanup function
+              return () => {
+                clearInterval(volumeInterval);
+                audioContext.close();
+              };
+            } catch (err) {
+              console.error("Failed to create volume meter:", err);
+              return () => {}; // Return empty cleanup function
             }
-          }, 5000);
+          };
+
+          const cleanup = createVolumeMeter(audioTrack);
+          return () => {
+            cleanup();
+            // ... other cleanup code
+          };
 
         } catch (err) {
           console.error('Error creating media tracks:', err);
@@ -449,8 +515,24 @@ export default function VideoComponent({ roomId, onLeave }) {
         {/* Local Video */}
         <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
           <div ref={localVideoRef} className="absolute inset-0"></div>
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded">
+          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded flex items-center">
             You {isVideoMuted && '(Camera Off)'}
+            
+            {/* Add this mic activity indicator */}
+            {!isAudioMuted && (
+              <div className="flex items-center ml-2">
+                <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" fill="currentColor" />
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" fill="currentColor" />
+                </svg>
+                <div className="ml-1 h-2 w-10 bg-gray-700 rounded overflow-hidden">
+                  <div 
+                    className="h-full bg-green-500 transition-all duration-200" 
+                    style={{ width: `${micActivity}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
