@@ -1,117 +1,147 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from 'firebase/auth';
-import { auth, db } from '../config/firebaseConfig';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { setCookie, deleteCookie } from 'cookies-next';
 
-import { doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
-
-const AuthContext = createContext({});
-
-export const useAuth = () => useContext(AuthContext);
+const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  async function signup(email, password, fullName) {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        fullName,
-        email,
-        createdAt: serverTimestamp()
-      });
-      return userCredential;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async function login(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
-  }
-
-  async function logout() {
-    return signOut(auth);
-  }
-
-  async function getEvents() {
-    if (!user) return [];
-    try {
-      const eventsRef = collection(db, 'events');
-      const querySnapshot = await getDocs(eventsRef);
-
-      const userEvents = [];
-      for (const eventDoc of querySnapshot.docs) {
-        const participantsRef = collection(eventDoc.ref, 'participants');
-        const participantQuery = query(participantsRef, where('userId', '==', user.uid));
-        const participantSnapshot = await getDocs(participantQuery);
-
-        if (!participantSnapshot.empty) {
-          userEvents.push({ id: eventDoc.id, ...eventDoc.data() });
-        }
-      }
-
-      return userEvents;
-    } catch (error) {
-      console.error('Error fetching events:', error);
-      return [];
-    }
-  }
-
-  async function getUserProfile() {
-    if (!user) return null;
-    try {
-      const docRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() };
-      } else {
-        console.log('No such document!');
-        return null;
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
-    }
-  }
-
+  // Check if user is logged in on initial load
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setUser({ ...user, ...docSnap.data() });
-        } else {
-          setUser(user);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+    const checkLoggedIn = async () => {
+      try {
+        const response = await fetch('/api/auth/checkAuth', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
 
-    return () => unsubscribe();
+        if (response.ok) {
+          const data = await response.json();
+          setUser({
+            email: data.email
+          });
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkLoggedIn();
   }, []);
+
+  // Login function
+  const login = async (email, password) => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Set user in state
+        setUser({
+          email: data.email
+        });
+        
+        return { success: true };
+      } else {
+        return { 
+          success: false, 
+          error: data.message || 'Login failed' 
+        };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return { 
+        success: false, 
+        error: 'Login failed. Please try again.' 
+      };
+    }
+  };
+
+  // Signup function
+  const signup = async (email, password, fullName) => {
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, fullName }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Set user in state
+        setUser({
+          email: data.email
+        });
+        
+        return { success: true };
+      } else {
+        return { 
+          success: false, 
+          error: data.message || 'Signup failed' 
+        };
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      return { 
+        success: false, 
+        error: 'Signup failed. Please try again.' 
+      };
+    }
+  };
+
+  // Logout function
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      // Clear user state
+      setUser(null);
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   const value = {
     user,
-    signup,
+    loading,
     login,
+    signup,
     logout,
-    getEvents,
-    getUserProfile, // Expose getUserProfile in the context
-    loading
-};
+    isAuthenticated: !!user
+  };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
 }

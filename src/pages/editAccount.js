@@ -4,11 +4,11 @@ import { updateProfile } from 'firebase/auth';
 import { auth, db } from './api/config/firebaseConfig';
 import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/router';
-import Header from '@/components/Header';
 import Head from 'next/head';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
 import imageCompression from 'browser-image-compression';
+import Sidebar from '@/components/layout/Sidebar';
 
 export default function EditAccount() {
   const { user } = useAuth();
@@ -181,7 +181,7 @@ export default function EditAccount() {
         <title>Edit Account | Studentious</title>
         <meta name="description" content="Edit your account settings" />
       </Head>
-      <Header />
+      <Sidebar />
       <div className="min-h-screen bg-gray-100 py-12">
         <div className="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden">
           <div className="px-6 py-8">
