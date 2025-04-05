@@ -4,6 +4,8 @@ import DashboardContent from '../components/layout/DashboardContent';
 import AuthGuard from './api/AuthGuard';
 import { useAuth } from './api/context/AuthContext';
 import { useEffect, useState } from 'react';
+import SendRecommendations from '../components/SendRecommendations';
+
 export default function Home() {
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
@@ -35,6 +37,9 @@ export default function Home() {
       <Layout>
         <Sidebar />
         <DashboardContent />
+        <div className="flex flex-col items-center justify-center flex-1 w-full p-4 text-gray-900">
+          <SendRecommendations/>
+        </div>
       </Layout>
     </AuthGuard>
   );
