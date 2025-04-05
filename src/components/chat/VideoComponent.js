@@ -182,6 +182,28 @@ export default function VideoComponent({ roomId, onLeave }) {
           data.uid
         );
 
+        // Force a reconnection of all participants after a brief delay
+        setTimeout(() => {
+          console.log("Running delayed participant check...");
+          
+          // Re-check remote users
+          const currentRemoteUsers = agoraClient.current.remoteUsers;
+          console.log(`Delayed check found ${currentRemoteUsers.length} remote users`);
+          
+          // Force update participant count
+          updateParticipantCount();
+          
+          // If we still don't see any remote users but expect to,
+          // try toggling the local tracks to trigger network activity
+          if (currentRemoteUsers.length === 0 && participantCount > 1) {
+            console.log("No remote users found but expecting some. Refreshing local tracks...");
+            if (localAudioTrack) {
+              localAudioTrack.setMuted(true);
+              setTimeout(() => localAudioTrack.setMuted(false), 500);
+            }
+          }
+        }, 3000);
+
         // IMPORTANT: Add this to detect users already in the channel
         console.log("Checking for existing users in channel...");
         // Get existing users in the channel
@@ -247,6 +269,11 @@ export default function VideoComponent({ roomId, onLeave }) {
             AEC: true, // Echo cancellation
             ANS: true, // Auto noise suppression
             AGC: true, // Auto gain control
+            encoderConfig: {
+              sampleRate: 48000,
+              stereo: false,
+              bitrate: 128 // Increase from default to fix the SEND_AUDIO_BITRATE_TOO_LOW warning
+            }
           }, 
           {
             encoderConfig: 'standard',
@@ -254,10 +281,32 @@ export default function VideoComponent({ roomId, onLeave }) {
           }
         );
 
+        // Make sure the audio is unmuted when first joining
+        await audioTrack.setMuted(false);
+        await videoTrack.setMuted(false);
+
         // Prevent echo by setting local audio volume to 0
         audioTrack.setVolume(0);
-        
-        await agoraClient.current.publish([audioTrack, videoTrack]);
+
+        // Log before publishing to help with debugging
+        console.log('Publishing local tracks to channel...');
+
+        // Publish tracks with explicit error handling
+        try {
+          await agoraClient.current.publish([audioTrack, videoTrack]);
+          console.log('Successfully published local tracks');
+        } catch (publishError) {
+          console.error('Failed to publish tracks:', publishError);
+          // Try publishing just audio if video fails
+          if (publishError.message.includes('video')) {
+            try {
+              await agoraClient.current.publish([audioTrack]);
+              console.log('Published audio-only as fallback');
+            } catch (audioError) {
+              console.error('Failed to publish audio as fallback:', audioError);
+            }
+          }
+        }
 
         setLocalAudioTrack(audioTrack);
         setLocalVideoTrack(videoTrack);
