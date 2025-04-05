@@ -187,7 +187,6 @@ export default function Sidebar() {
           <a href="/account">
             <div>
               <p className="text-sm font-medium text-gray-700">{currentUser.fullName}</p>
-              <p className="text-xs text-gray-500">Student</p>
             </div>
           </a>
         </div>
