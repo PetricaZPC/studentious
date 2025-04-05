@@ -7,7 +7,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '../config/firebaseConfig';
 
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
 const AuthContext = createContext({});
 
@@ -39,6 +39,47 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
+  async function getEvents() {
+    if (!user) return [];
+    try {
+      const eventsRef = collection(db, 'events');
+      const querySnapshot = await getDocs(eventsRef);
+
+      const userEvents = [];
+      for (const eventDoc of querySnapshot.docs) {
+        const participantsRef = collection(eventDoc.ref, 'participants');
+        const participantQuery = query(participantsRef, where('userId', '==', user.uid));
+        const participantSnapshot = await getDocs(participantQuery);
+
+        if (!participantSnapshot.empty) {
+          userEvents.push({ id: eventDoc.id, ...eventDoc.data() });
+        }
+      }
+
+      return userEvents;
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      return [];
+    }
+  }
+
+  async function getUserProfile() {
+    if (!user) return null;
+    try {
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() };
+      } else {
+        console.log('No such document!');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -63,8 +104,10 @@ export function AuthProvider({ children }) {
     signup,
     login,
     logout,
+    getEvents,
+    getUserProfile, // Expose getUserProfile in the context
     loading
-  };
+};
 
   return (
     <AuthContext.Provider value={value}>

@@ -147,10 +147,12 @@ function BecomeTeacher({ user, onSuccess }) {
 }
 
 export default function Account() {
-  const { user, logout } = useAuth(); 
+  const { user, logout, getEvents } = useAuth(); // Access getEvents from useAuth
   const [currentUser, setCurrentUser] = useState(user);
   const [error, setError] = useState("");
   const [profileImage, setProfileImage] = useState(null);
+  const [eventsJoined, setEventsJoined] = useState([]);
+
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -195,6 +197,20 @@ export default function Account() {
       fetchProfileImage();
     }
   }, [user]);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const events = await getEvents(); // Use getEvents from AuthContext
+        setEventsJoined(events);
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      }
+    };
+    if (user) {
+      fetchEvents();
+    }
+  }, [user, getEvents]);
 
   if (!currentUser) {
     return (
@@ -338,7 +354,8 @@ export default function Account() {
                   </div>
                   <div className="ml-4 flex-1">
                     <p className="text-sm text-gray-500">Events Joined</p>
-                    <p className="text-2xl font-semibold text-gray-800">0</p>
+                    <p className="text-2xl font-semibold text-gray-800">{eventsJoined.length}</p>
+                    {console.log(eventsJoined.length)}
                   </div>
                 </div>
                 
