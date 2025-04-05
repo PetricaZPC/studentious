@@ -3,6 +3,16 @@ import '../styles/globals.css';
 import { useRouter } from 'next/router';
 import AuthGuard from './api/AuthGuard';
 import { useEffect } from 'react';
+import dynamic from 'next/dynamic';
+
+// Enable Agora debugging in development environment
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  // This will be dynamically imported only in the browser
+  const AgoraRTC = dynamic(() => import('agora-rtc-sdk-ng'), { ssr: false });
+  if (AgoraRTC.default) {
+    AgoraRTC.default.setLogLevel(1); // Set to DEBUG level (0: DEBUG, 1: INFO, 2: WARNING, 3: ERROR, 4: NONE)
+  }
+}
 
 const publicPaths = ['/login', '/signup', '/'];
 
