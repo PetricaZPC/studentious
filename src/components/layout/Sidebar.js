@@ -167,9 +167,9 @@ const Sidebar = React.memo(function Sidebar() {
               />
             </svg>
           }
-          label="Messages"
+          label="Chatrooms"
           active={isMessages}
-          href="/messages"
+          href="/chatrooms"
         />
         <NavItem
           icon={
