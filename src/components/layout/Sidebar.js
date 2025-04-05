@@ -1,4 +1,4 @@
-import {auth ,db} from "@/pages/api/config/firebaseConfig";
+import { auth, db } from "@/pages/api/config/firebaseConfig";
 import { useAuth } from "@/pages/api/context/AuthContext";
 import { doc, getDoc } from "firebase/firestore";
 import { useParams } from "next/navigation";
@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation'
 import { isMatch } from "date-fns";
 
 export default function Sidebar() {
-  const { user } = useAuth();
+  const { user, getUserProfile } = useAuth(); // Access getUserProfile from AuthContext
   const [currentUser, setCurrentUser] = useState(user);
   const [profileImage, setProfileImage] = useState(null);
   const isDashboard = usePathname() === "/";
@@ -18,22 +18,29 @@ export default function Sidebar() {
   const isResources = usePathname() === "/resources";
   const isAccount = usePathname() === "/account";
   useEffect(() => {
-      if (user) {
-        const fetchProfileImage = async () => {
-          try {
-            const docRef = doc(db, 'userProfiles', user.uid);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists() && docSnap.data().photoURL) {
-              setProfileImage(docSnap.data().photoURL);
-            }
-          } catch (error) {
-            console.error('Error fetching profile image:', error);
+    if (user) {
+      const fetchProfileImage = async () => {
+        try {
+          const docRef = doc(db, 'userProfiles', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists() && docSnap.data().photoURL) {
+            setProfileImage(docSnap.data().photoURL);
           }
-        };
-        fetchProfileImage();
-      }
-    }, [user]);
-  
+        } catch (error) {
+          console.error('Error fetching profile image:', error);
+        }
+      };
+      fetchProfileImage();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // Fetch user profile when the component mounts
+    getUserProfile().then((data) => {
+      setCurrentUser(data);
+    });
+  }, [getUserProfile]);
+
   return (
     <nav className="w-64 fixed left-0 top-0 h-full bg-white p-6 border-r border-gray-200 shadow-sm flex flex-col">
       {/* Logo with text */}
@@ -46,7 +53,7 @@ export default function Sidebar() {
 
       {/* Navigation Links */}
       <ul className="space-y-2 flex-1">
-        <NavItem
+      <NavItem
           icon={
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -59,14 +66,13 @@ export default function Sidebar() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+               d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
               />
             </svg>
           }
           label="Dashboard"
           active={isDashboard}
         />
-
         <NavItem
           icon={
             <svg
@@ -87,7 +93,6 @@ export default function Sidebar() {
           label="Messages"
           active={isMessages}
         />
-
         <NavItem
           icon={
             <svg
@@ -106,9 +111,8 @@ export default function Sidebar() {
             </svg>
           }
           label="Courses"
-          active={isMessages}
+          active={isCourses}
         />
-
         <NavItem
           icon={
             <svg
@@ -129,7 +133,6 @@ export default function Sidebar() {
           label="Calendar"
           active={isCalendar}
         />
-
         <NavItem
           icon={
             <svg
@@ -155,17 +158,14 @@ export default function Sidebar() {
       {/* User Profile & Help */}
       <div className="mt-auto pt-4 border-t border-gray-200">
         <div className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 cursor-pointer">
-          {
-            currentUser.photoURL  ? (
-              <img
-                src={currentUser.photoURL}
-                alt="Profile"
-                className="h-8 w-8 rounded-full object-cover"
-              />
-            )
-            :
-            (
-              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+          {profileImage ? (
+            <img
+              src={profileImage}
+              alt="Profile"
+              className="h-8 w-8 rounded-full object-cover"
+            />
+          ) : (
+            <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-5 w-5 text-blue-500"
@@ -179,11 +179,7 @@ export default function Sidebar() {
                 />
               </svg>
             </div>
-            )
-
-          }
-          
-
+          )}
           <a href="/account">
             <div>
               <p className="text-sm font-medium text-gray-700">{currentUser.fullName}</p>
@@ -215,7 +211,7 @@ function NavItem({ icon, label, active = false }) {
   return (
     <li>
       <a
-        href={(label!=="Dashboard") ? `/${label.toLowerCase()}` : "/"}
+        href={(label !== "Dashboard") ? `/${label.toLowerCase()}` : "/"}
         className={`flex items-center p-3 rounded-lg ${
           active
             ? "bg-blue-50 text-blue-600"
