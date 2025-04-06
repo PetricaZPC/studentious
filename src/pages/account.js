@@ -7,7 +7,6 @@ import { useRouter } from 'next/router';
 import AuthGuard from './api/AuthGuard';
 import Layout from "../components/layout/Layout";
 import Sidebar from "../components/layout/Sidebar";
-import RightPanel from "../components/layout/RightPanel";
 
 function BecomeTeacher({ user, onSuccess }) {
   const [showTeacherForm, setShowTeacherForm] = useState(false);
