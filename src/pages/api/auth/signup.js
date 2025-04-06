@@ -2,6 +2,7 @@ import clientPromise from './mongodb';
 import { hash } from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { serialize } from 'cookie';
+import { sendWelcomeEmail } from '../../../utils/sendWelcomeEmail';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -9,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, password, fullName } = req.body;
+    const { email, password, name } = req.body;
     
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
     const newUser = {
       email: email.toLowerCase(),
       password: hashedPassword,
-      fullName: fullName || '',
+      fullName: name || '',
       createdAt: new Date(),
       sessionId,
       intersts: [],
@@ -54,13 +55,19 @@ export default async function handler(req, res) {
     });
 
     res.setHeader('Set-Cookie', cookie);
+
+    // Send welcome email after successful signup
+    await sendWelcomeEmail(email, name);
     
     return res.status(201).json({
-      message: 'User created',
-      email: newUser.email
+      message: 'User created successfully',
+      user: {
+        email,
+        name
+      }
     });
   } catch (error) {
     console.error('Signup error:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: 'Error creating user' });
   }
 }
