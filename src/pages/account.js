@@ -7,7 +7,6 @@ import { useRouter } from 'next/router';
 import AuthGuard from './api/AuthGuard';
 import Layout from "../components/layout/Layout";
 import Sidebar from "../components/layout/Sidebar";
-import RightPanel from "../components/layout/RightPanel";
 
 function BecomeTeacher({ user, onSuccess }) {
   const [showTeacherForm, setShowTeacherForm] = useState(false);
@@ -486,7 +485,14 @@ export default function Account() {
                       : "Not available"}
                   </p>
                 </div>
-                
+                <div className="transition-all hover:bg-gray-50 p-3 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Interests</label>
+                  <p className="text-gray-800 font-medium">
+                    {currentUser?.interests?.length > 0
+                      ? currentUser.interests.join(', ') // Display interests as a comma-separated list
+                      : "Not set"}
+                  </p>
+                </div>
                 <BecomeTeacher 
                   user={currentUser} 
                   onSuccess={() => {

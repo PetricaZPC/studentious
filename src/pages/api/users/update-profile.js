@@ -20,18 +20,25 @@ export default async function handler(req, res) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
 
-    const { fullName, photoURL } = req.body;
+    const { fullName, photoURL, interests } = req.body; // Fixed typo from "intersts" to "interests"
     
     console.log('BEFORE UPDATE - Current user fullName:', user.fullName);
-    console.log('Updating user profile with fullName:', fullName);
+    console.log('Updating user profile with fullName:', fullName, 'and interests:', interests);
     
-    // Update user data with fullName in the users collection
+    // Update user data with fullName and interests in the users collection
+    const updateFields = {};
     if (fullName !== undefined) {
+      updateFields.fullName = fullName;
+    }
+    if (interests !== undefined) {
+      updateFields.interests = interests; // Fixed typo
+    }
+
+    if (Object.keys(updateFields).length > 0) {
       const result = await usersCollection.updateOne(
         { _id: user._id },
-        { $set: { fullName: fullName } }
+        { $set: updateFields }
       );
-      
       console.log('MongoDB update result:', result);
     }
     
@@ -57,11 +64,12 @@ export default async function handler(req, res) {
     
     // Fetch the updated user to confirm changes
     const updatedUser = await usersCollection.findOne({ _id: user._id });
-    console.log('AFTER UPDATE - Updated user fullName:', updatedUser.fullName);
+    console.log('AFTER UPDATE - Updated user fullName:', updatedUser.fullName, 'and interests:', updatedUser.interests);
     
     return res.status(200).json({ 
       message: 'Profile updated successfully',
-      fullName: updatedUser.fullName || fullName
+      fullName: updatedUser.fullName || fullName,
+      interests: updatedUser.interests || interests,
     });
   } catch (error) {
     console.error('Error updating profile:', error);

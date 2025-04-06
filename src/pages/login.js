@@ -129,7 +129,20 @@ export default function Login() {
               <p className="text-xs text-gray-500 mt-1">Use 8 or more characters with a mix of letters, numbers & symbols</p>
             )}
           </div>
+            {/* {!isLoginForm && (
+              // topics of interst
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Topics of Interest</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    placeholder="e.g. Web Development, Data Science"
+                  />
+                </div>
 
+              </div>
+            )} */}
           <button
             type="submit"
             disabled={loading}

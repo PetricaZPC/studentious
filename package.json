@@ -17,6 +17,7 @@
     "@heroicons/react": "^1.0.6",
     "agora-access-token": "^2.0.4",
     "agora-rtc-sdk-ng": "^4.23.2",
+    "all": "^0.0.0",
     "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",

@@ -16,6 +16,7 @@ export default function EditAccount() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [interests, setInterests] = useState([]);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -102,10 +103,10 @@ export default function EditAccount() {
 
     try {
       const updateData = {
-        fullName: displayName
+        fullName: displayName, // Send fullName
+        interests: interests, // Use the correct state variable for interests
       };
       
-      // Process image if selected
       if (selectedImage) {
         const base64Image = await convertImageToBase64(selectedImage);
         if (base64Image.length > 150000) {
@@ -114,9 +115,8 @@ export default function EditAccount() {
         updateData.photoURL = base64Image;
       }
       
-      console.log('Sending update with data:', updateData);
+      console.log('Sending update with data:', updateData); // Debugging
       
-      // Update profile
       const response = await fetch('/api/users/update-profile', {
         method: 'POST',
         headers: {
@@ -126,47 +126,17 @@ export default function EditAccount() {
         credentials: 'include'
       });
       
-      const data = await response.json();
-      console.log('Profile update response:', data);
+      const data = await response.json(); // Get the response data
+      console.log('Profile update response:', data); // Debugging
       
       if (!response.ok) {
         throw new Error(data.message || 'Failed to update profile');
       }
       
       setMessage('Profile updated successfully!');
-      
-      // CRITICAL: This must be a synchronous series of operations
-      try {
-        console.log('Starting refresh process...');
-        
-        // 1. Force refresh user data in auth context
-        await refreshUser();
-        console.log('Auth user refreshed');
-        
-        // 2. Clear ALL caches
-        localStorage.removeItem('profile_data');
-        sessionStorage.clear();
-        
-        // 3. Clear any session-level browser cache
-        await fetch('/api/users/clear-cache', {
-          method: 'POST',
-          credentials: 'include'
-        }).catch(e => console.log('Cache clear API call error (ignorable):', e));
-        
-        // 4. Wait before redirecting to ensure all updates have propagated
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        console.log('Redirecting to account page with cache busting...');
-        
-        // 5. Redirect with heavy cache busting
-        const timestamp = Date.now();
-        window.location.href = `/account?updated=${timestamp}&nocache=true`;
-        
-        // Don't use router.push as it might preserve some state
-        // router.push(`/account?updated=${timestamp}&nocache=true`);
-      } catch (refreshError) {
-        console.error('Error during refresh sequence:', refreshError);
-      }
+      setTimeout(() => {
+        router.push('/account');
+      }, 2000);
     } catch (err) {
       console.error('Profile update error:', err);
       setError(err.message || 'Failed to update profile');
@@ -256,7 +226,12 @@ export default function EditAccount() {
                   placeholder="Enter your display name"
                 />
               </div>
-
+                <input
+                  type="text"
+                  value={interests}
+                  onChange={(e) => setInterests(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  placeholder="Enter your interests"/>
               <div className="flex items-center justify-between mt-6">
                 <button
                   type="submit"

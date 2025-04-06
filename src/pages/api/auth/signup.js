@@ -38,7 +38,8 @@ export default async function handler(req, res) {
       password: hashedPassword,
       fullName: fullName || '',
       createdAt: new Date(),
-      sessionId
+      sessionId,
+      intersts: [],
     };
 
     const result = await users.insertOne(newUser);

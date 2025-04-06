@@ -270,6 +270,9 @@ const Sidebar = React.memo(function Sidebar() {
             </div>
           </Link>
         </div>
+        <a
+          href='/contactandhelp'
+          >
         <div className="mt-4 flex items-center p-2 rounded-lg hover:bg-gray-100 cursor-pointer text-gray-600 hover:text-blue-500">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -285,6 +288,7 @@ const Sidebar = React.memo(function Sidebar() {
           </svg>
           <span className="text-sm">Help & Support</span>
         </div>
+        </a>
       </div>
     </nav>
   );
