@@ -14,12 +14,15 @@ const Sidebar = React.memo(function Sidebar() {
   const router = useRouter();
   const profileFetchedRef = useRef(false);
   
-  const isDashboard = usePathname() === "/";
-  const isCalendar = usePathname() === "/calendar";
-  const isCourses = usePathname() === "/courses"; 
-  const isMessages = usePathname() === "/messages";
-  const isResources = usePathname() === "/resources";
-  const isAccount = usePathname() === "/account";
+  const pathname = usePathname();
+  
+  // Updated path checks to match your actual routes
+  const isDashboard = pathname === "/";
+  const isCalendar = pathname === "/calendar";
+  const isCourses = pathname === "/courses"; 
+  const isChatrooms = pathname === "/chatrooms" || pathname?.startsWith("/chatrooms"); // Check for both exact and nested chatroom routes
+  const isResources = pathname === "/resources";
+  const isAccount = pathname === "/account";
 
   // Create a stable fetch function with improved caching
   const fetchProfileData = useCallback(async (forceRefresh = false) => {
@@ -168,7 +171,7 @@ const Sidebar = React.memo(function Sidebar() {
             </svg>
           }
           label="Chatrooms"
-          active={isMessages}
+          active={isChatrooms} // Updated to use the correct variable
           href="/chatrooms"
         />
         <NavItem
