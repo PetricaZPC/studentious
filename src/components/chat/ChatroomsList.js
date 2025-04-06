@@ -2,10 +2,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 
-export default function ChatroomsList({ chatrooms, loading, error, activeChatroom }) {
+export default function ChatroomsList({ 
+  chatrooms, 
+  loading, 
+  error, 
+  activeChatroom,
+  showAsModal = false,
+  onClose,
+  onCreated
+}) {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [newChatroomName, setNewChatroomName] = useState('')
   const [newChatroomType, setNewChatroomType] = useState('General')
   const [newChatroomDescription, setNewChatroomDescription] = useState('')
@@ -58,17 +65,14 @@ export default function ChatroomsList({ chatrooms, loading, error, activeChatroo
         throw new Error(data.message || 'Failed to create chatroom')
       }
       
-      // Close modal and reset form
-      setShowCreateModal(false)
-      setNewChatroomName('')
-      setNewChatroomType('General')
-      setNewChatroomDescription('')
-      setIsPublic(true)
+      // Call the onCreated callback with the new chatroom data
+      if (onCreated) {
+        onCreated(data.chatroom)
+      } else {
+        // Navigate to the new chatroom
+        router.push(`/chatrooms?roomId=${data.chatroom.id}`)
+      }
       
-      // Navigate to the new chatroom
-      router.push(`/chatrooms?roomId=${data.chatroom.id}`)
-      
-      // You might want to update the chatrooms list here or refetch
     } catch (err) {
       console.error('Error creating chatroom:', err)
       setErrorMessage(err.message || 'Failed to create chatroom')
@@ -77,6 +81,95 @@ export default function ChatroomsList({ chatrooms, loading, error, activeChatroo
     }
   }
 
+  // If used as a modal, only render the form
+  if (showAsModal) {
+    return (
+      <div className="p-6">
+        {errorMessage && (
+          <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm">
+            {errorMessage}
+          </div>
+        )}
+        
+        <form onSubmit={handleCreateChatroom}>
+          <div className="mb-4">
+            <label htmlFor="chatroomName" className="block text-sm font-medium text-gray-700 mb-1">Chatroom Name*</label>
+            <input
+              id="chatroomName"
+              type="text"
+              value={newChatroomName}
+              onChange={(e) => setNewChatroomName(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Enter chatroom name"
+              required
+            />
+          </div>
+          
+          <div className="mb-4">
+            <label htmlFor="chatroomType" className="block text-sm font-medium text-gray-700 mb-1">Chatroom Type</label>
+            <select
+              id="chatroomType"
+              value={newChatroomType}
+              onChange={(e) => setNewChatroomType(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="General">General</option>
+              <option value="Event">Event</option>
+              <option value="Course">Course</option>
+              <option value="Study Group">Study Group</option>
+              <option value="Project">Project</option>
+            </select>
+          </div>
+          
+          <div className="mb-4">
+            <label htmlFor="chatroomDescription" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              id="chatroomDescription"
+              value={newChatroomDescription}
+              onChange={(e) => setNewChatroomDescription(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Describe the purpose of this chatroom"
+              rows={3}
+            />
+          </div>
+          
+          <div className="mb-5">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+              <span className="ml-2 text-sm text-gray-700">Public Chatroom</span>
+            </label>
+            <p className="mt-1 text-xs text-gray-500">Public chatrooms are visible to all users. Private chatrooms are invite-only.</p>
+          </div>
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                isSubmitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+              }`}
+            >
+              {isSubmitting ? 'Creating...' : 'Create Chatroom'}
+            </button>
+          </div>
+        </form>
+      </div>
+    )
+  }
+
+  // Otherwise, this is the original sidebar version which is now mostly unused
   return (
     <div className="h-full flex flex-col">
       <div className="p-4 border-b border-gray-200">
@@ -136,13 +229,17 @@ export default function ChatroomsList({ chatrooms, loading, error, activeChatroo
                             <div className="font-medium text-gray-900">{room.name}</div>
                             <div className="text-sm text-gray-500 truncate">{room.lastMessage || 'No messages yet'}</div>
                           </div>
-                          
-                          {/* Unread messages badge */}
-                          {room.unreadCount > 0 && (
-                            <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full">
-                              {room.unreadCount}
-                            </span>
-                          )}
+                          <div className="flex flex-col items-end">
+                            <div className="text-xs text-gray-500">
+                              {room.lastMessageTime ? new Date(room.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </div>
+                            {/* Unread messages badge */}
+                            {room.unreadCount > 0 && (
+                              <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full">
+                                {room.unreadCount}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </Link>
                     </li>
@@ -151,97 +248,6 @@ export default function ChatroomsList({ chatrooms, loading, error, activeChatroo
               </div>
             ))
           )}
-        </div>
-      )}
-      
-      {/* Create new chatroom button */}
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          Create New Chatroom
-        </button>
-      </div>
-      
-      {/* Create Chatroom Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg w-96">
-            <form onSubmit={handleCreateChatroom} className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Chatroom</h3>
-              
-              {errorMessage && (
-                <div className="text-sm text-red-600 mb-4">{errorMessage}</div>
-              )}
-              
-              <div className="mb-4">
-                <label htmlFor="chatroomName" className="block text-sm font-medium text-gray-700">Chatroom Name</label>
-                <input
-                  id="chatroomName"
-                  type="text"
-                  value={newChatroomName}
-                  onChange={(e) => setNewChatroomName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="chatroomType" className="block text-sm font-medium text-gray-700">Chatroom Type</label>
-                <select
-                  id="chatroomType"
-                  value={newChatroomType}
-                  onChange={(e) => setNewChatroomType(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="General">General</option>
-                  <option value="Event">Event</option>
-                  <option value="Course">Course</option>
-                </select>
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="chatroomDescription" className="block text-sm font-medium text-gray-700">Description</label>
-                <textarea
-                  id="chatroomDescription"
-                  value={newChatroomDescription}
-                  onChange={(e) => setNewChatroomDescription(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={isPublic}
-                    onChange={(e) => setIsPublic(e.target.checked)}
-                    className="form-checkbox h-4 w-4 text-indigo-600"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Public Chatroom</span>
-                </label>
-              </div>
-              
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`ml-2 px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                    isSubmitting ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
-                  }`}
-                >
-                  {isSubmitting ? 'Creating...' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
     </div>
