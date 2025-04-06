@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/pages/api/context/AuthContext';
 import { IoClose, IoDocument, IoVolumeHigh, IoPause, IoPlay, IoCheckmarkCircle, IoWarning, IoCalendar, IoTime, IoEye, IoCloudDownload, IoSparkles, IoMenu } from 'react-icons/io5';
+import { BsTranslate } from 'react-icons/bs';
 
 export default function CoursesContent() {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ export default function CoursesContent() {
   // Summary state
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summarizingCourseId, setSummarizingCourseId] = useState(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [notification, setNotification] = useState(null);
   
   // Viewer state
   const [viewingCourse, setViewingCourse] = useState(null);
@@ -34,6 +37,11 @@ export default function CoursesContent() {
 
   // Sidebar state for mobile views
   const [sidebarVisible, setSidebarVisible] = useState(false);
+
+  // Translation state
+  const [translatingCourseId, setTranslatingCourseId] = useState(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
 
   // Toggle sidebar visibility for mobile views
   const toggleSidebar = () => {
@@ -150,31 +158,78 @@ export default function CoursesContent() {
     }
   };
 
-  const generateSummary = async (courseId, fileUrl, fileType) => {
+  const generateSummary = async (courseId) => {
+    setIsGeneratingSummary(true);
+    setSummarizingCourseId(courseId);
+    setError('');
+    
     try {
-      setSummarizingCourseId(courseId);
+      // Log the request for debugging
+      console.log('Sending summary request for courseId:', courseId);
+
+      // API call with proper error handling
       const response = await fetch('/api/courses/summarize', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          courseId,
-          fileUrl,
-          fileType
-        }),
-        credentials: 'include'
+        body: JSON.stringify({ courseId }),
       });
       
+      // Parse response JSON
+      const data = await response.json();
+      
+      // Check for API errors
       if (!response.ok) {
-        throw new Error('Summary generation failed');
+        console.error('API error:', data);
+        
+        // If the file is not found, provide a more helpful error message
+        if (data.message === 'Course file not found' || data.message === 'Course file not found in database') {
+          throw new Error('The course file could not be found. It may have been deleted or corrupted. Please try re-uploading the file.');
+        }
+        
+        throw new Error(data.message || data.error || 'Summary generation failed');
       }
       
-      await response.json();
-      fetchCourses();
+      console.log('Summary generated successfully:', data.summary.substring(0, 100) + '...');
+      
+      // Update the course in your UI state
+      setCourses(prevCourses => 
+        prevCourses.map(course => 
+          course._id === courseId ? {
+            ...course,
+            summary: data.summary,
+            summarized: true,
+            detectedLanguage: data.detectedLanguage
+          } : course
+        )
+      );
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: 'Summary generated successfully!'
+      });
+      
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      
     } catch (err) {
-      console.error('Error generating summary:', err);
+      console.error('Summary generation error:', err);
+      setError(err.message || 'An error occurred while generating the summary');
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: err.message || 'Summary generation failed'
+      });
+      
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
     } finally {
+      setIsGeneratingSummary(false);
       setSummarizingCourseId(null);
     }
   };
@@ -292,6 +347,98 @@ export default function CoursesContent() {
   
   const closeSummaryViewer = () => {
     setViewingSummary(null);
+  };
+
+  const translateSummary = async (course, targetLanguage) => {
+    if (isTranslating) return;
+    if (!course.summary) {
+      setError('No summary available to translate');
+      return;
+    }
+    
+    // If the target language matches the detected language, no need to translate
+    if (targetLanguage === course.detectedLanguage) {
+      setError('Summary is already in this language');
+      return;
+    }
+    
+    setIsTranslating(true);
+    setTranslatingCourseId(course._id);
+    setError('');
+    
+    try {
+      const response = await fetch('/api/courses/translate-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          courseId: course._id,
+          targetLanguage 
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to translate summary');
+      }
+      
+      // Update the course in your state
+      setCourses(prevCourses => 
+        prevCourses.map(c => 
+          c._id === course._id ? {
+            ...c,
+            translations: {
+              ...(c.translations || {}),
+              [targetLanguage]: {
+                summary: data.translatedSummary,
+                timestamp: new Date()
+              }
+            }
+          } : c
+        )
+      );
+      
+      // If we're in the summary viewer, update the viewing summary
+      if (viewingSummary && viewingSummary._id === course._id) {
+        setViewingSummary({
+          ...viewingSummary,
+          translations: {
+            ...(viewingSummary.translations || {}),
+            [targetLanguage]: {
+              summary: data.translatedSummary,
+              timestamp: new Date()
+            }
+          }
+        });
+      }
+      
+      setNotification({
+        type: 'success',
+        message: 'Summary translated successfully!'
+      });
+      
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      
+    } catch (err) {
+      console.error('Translation error:', err);
+      setError(err.message || 'An error occurred while translating the summary');
+      
+      setNotification({
+        type: 'error',
+        message: err.message || 'Translation failed'
+      });
+      
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+    } finally {
+      setIsTranslating(false);
+      setTranslatingCourseId(null);
+    }
   };
 
   return (
@@ -678,6 +825,30 @@ export default function CoursesContent() {
                                       )}
                                     </button>
                                   )}
+
+                                  {/* Translate Button */}
+                                  {course.summarized && (
+                                    <button
+                                      onClick={() => translateSummary(course, selectedLanguage)}
+                                      disabled={translatingCourseId === course._id}
+                                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {translatingCourseId === course._id ? (
+                                        <>
+                                          <svg className="animate-spin h-3.5 w-3.5 mr-1.5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Translating...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <BsTranslate className="h-3.5 w-3.5 mr-1.5" />
+                                          Translate
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -713,10 +884,50 @@ export default function CoursesContent() {
                   </div>
                   
                   <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 sm:px-8">
-                    <h3 className="text-lg sm:text-xl font-bold text-white flex items-center">
-                      <IoSparkles className="h-5 w-5 mr-2 text-indigo-200" />
-                      AI Summary: {viewingSummary.name}
-                    </h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-lg sm:text-xl font-bold text-white flex items-center">
+                        <IoSparkles className="h-5 w-5 mr-2 text-indigo-200" />
+                        AI Summary: {viewingSummary.name}
+                      </h3>
+                      
+                      {/* Add this new language selector */}
+                      {viewingSummary.summarized && (
+                        <div className="flex items-center mt-2 sm:mt-0 space-x-2">
+                          <select
+                            value={selectedLanguage}
+                            onChange={(e) => setSelectedLanguage(e.target.value)}
+                            className="bg-white/20 text-white border border-white/30 text-sm rounded-lg px-2 py-1 focus:ring-2 focus:ring-white/50 focus:border-transparent"
+                          >
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="ru">Russian</option>
+                            <option value="zh">Chinese</option>
+                            <option value="ja">Japanese</option>
+                            <option value="ko">Korean</option>
+                            <option value="ar">Arabic</option>
+                          </select>
+                          
+                          <button
+                            onClick={() => translateSummary(viewingSummary, selectedLanguage)}
+                            disabled={isTranslating || selectedLanguage === viewingSummary.detectedLanguage}
+                            className={`flex items-center text-sm rounded-lg px-3 py-1 ${
+                              isTranslating || selectedLanguage === viewingSummary.detectedLanguage
+                                ? 'bg-white/10 text-white/50 cursor-not-allowed'
+                                : 'bg-white/20 text-white hover:bg-white/30'
+                            } transition-colors`}
+                          >
+                            <BsTranslate className="mr-1.5" />
+                            {isTranslating && translatingCourseId === viewingSummary._id 
+                              ? 'Translating...' 
+                              : 'Translate'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="flex border-b border-gray-200">
@@ -738,20 +949,32 @@ export default function CoursesContent() {
                   <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
                     <div className="px-6 py-6 sm:px-8 sm:py-8">
                       <article className="prose prose-indigo max-w-none">
-                        {viewingSummary.summary.split('\n').map((line, i) => (
-                          line.startsWith('##') ? (
-                            <h2 key={i} className="text-xl sm:text-2xl font-bold mt-6 mb-3 pb-2 text-gray-800 border-b border-gray-200">
-                              {line.replace('##', '').trim()}
-                            </h2>
-                          ) : line.startsWith('•') ? (
-                            <div key={i} className="flex items-start mb-2 pl-2">
-                              <span className="text-indigo-500 mr-2 font-bold">•</span>
-                              <p className="my-0 text-gray-700">{line.substring(1).trim()}</p>
-                            </div>
-                          ) : (
-                            <p key={i} className={`${line.trim() === '' ? 'my-4' : 'my-2'} text-gray-700`}>{line}</p>
-                          )
-                        ))}
+                        {/* Determine which summary to show */}
+                        {(() => {
+                          // Get translated summary if available
+                          const translatedSummary = viewingSummary.translations?.[selectedLanguage]?.summary;
+                          
+                          // Use original summary as fallback
+                          const summaryToShow = (selectedLanguage === viewingSummary.detectedLanguage || !translatedSummary)
+                            ? viewingSummary.summary
+                            : translatedSummary;
+                          
+                          // Render the summary
+                          return summaryToShow.split('\n').map((line, i) => (
+                            line.startsWith('##') ? (
+                              <h2 key={i} className="text-xl sm:text-2xl font-bold mt-6 mb-3 pb-2 text-gray-800 border-b border-gray-200">
+                                {line.replace('##', '').trim()}
+                              </h2>
+                            ) : line.startsWith('•') ? (
+                              <div key={i} className="flex items-start mb-2 pl-2">
+                                <span className="text-indigo-500 mr-2 font-bold">•</span>
+                                <p className="my-0 text-gray-700">{line.substring(1).trim()}</p>
+                              </div>
+                            ) : (
+                              <p key={i} className={`${line.trim() === '' ? 'my-4' : 'my-2'} text-gray-700`}>{line}</p>
+                            )
+                          ));
+                        })()}
                       </article>
                       
                       <div className="mt-8 pt-6 border-t border-gray-200 bg-gray-50 rounded-xl p-4">
