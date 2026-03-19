@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/pages/api/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 
 export default function VideoComponent({ roomId, onLeave }) {
@@ -22,7 +22,6 @@ export default function VideoComponent({ roomId, onLeave }) {
   const updateParticipantCount = () => {
     // Need to manually count since remoteUsers state might not be updated yet
     const count = 1 + Object.keys(agoraClient.current.remoteUsers).length;
-    console.log(`Updating participant count to ${count} (remote users: ${JSON.stringify(Object.keys(agoraClient.current.remoteUsers))})`);
     setParticipantCount(count);
   };
 
@@ -38,43 +37,34 @@ export default function VideoComponent({ roomId, onLeave }) {
 
         // Add connection state change listener
         agoraClient.current.on('connection-state-change', (curState, prevState) => {
-          console.log(`Connection state changed from ${prevState} to ${curState}`);
           setConnectionState(curState);
         });
 
         // Add user-joined listener BEFORE joining
         agoraClient.current.on('user-joined', async (user) => {
-          console.log(`User ${user.uid} joined the channel`);
-          
-          // Immediately add user to remoteUsers with placeholder data
-          setRemoteUsers(prev => ({
+            setRemoteUsers(prev => ({
             ...prev,
-            [user.uid]: { 
-              ...prev[user.uid], 
+            [user.uid]: {
+              ...prev[user.uid],
               uid: user.uid,
               name: `User-${user.uid}`,
-              hasJoined: true
-            }
+              hasJoined: true,
+            },
           }));
-          
-          // Update participant count immediately when someone joins
+
           updateParticipantCount();
         });
-
         // Add user-published handler BEFORE joining
         const handleUserPublished = async (user, mediaType) => {
           await agoraClient.current.subscribe(user, mediaType);
-          console.log(`Remote user ${user.uid} published ${mediaType}`);
-          
-          // Try to get remote user's name
           let userName = `User-${user.uid}`;
           try {
             const attrs = await agoraClient.current.getUserAttributes(user.uid);
             if (attrs && attrs.name) {
               userName = attrs.name;
             }
-          } catch (err) {
-            console.warn('Failed to get user attributes:', err);
+          } catch {
+            // Ignore attribute retrieval errors
           }
 
           if (mediaType === 'video') {
@@ -93,35 +83,30 @@ export default function VideoComponent({ roomId, onLeave }) {
                 if (videoContainer && user.videoTrack) {
                   user.videoTrack.play(videoContainer);
                 }
-              } catch (err) {
-                console.warn(`Error playing video for user ${user.uid}:`, err);
+              } catch {
+                // Ignore playback errors
               }
             }, 200);
           }
           
           if (mediaType === 'audio') {
-            console.log(`Processing audio track for remote user ${user.uid}`);
-            
             setRemoteUsers(prev => ({
               ...prev,
-              [user.uid]: { 
-                ...prev[user.uid], 
-                audioTrack: user.audioTrack, 
+              [user.uid]: {
+                ...prev[user.uid],
+                audioTrack: user.audioTrack,
                 name: userName,
-                hasAudio: true
-              }
+                hasAudio: true,
+              },
             }));
-            
-            // Important: Make sure audio is played properly
+
             try {
               if (user.audioTrack) {
-                console.log(`Playing audio for user ${user.uid}`);
-                // Make sure volume is set high enough
                 user.audioTrack.setVolume(100);
                 user.audioTrack.play();
               }
-            } catch (audioPlayError) {
-              console.error(`Error playing audio for user ${user.uid}:`, audioPlayError);
+            } catch {
+              // Ignore audio playback issues
             }
           }
           
@@ -133,18 +118,14 @@ export default function VideoComponent({ roomId, onLeave }) {
 
         // Add user-left handler BEFORE joining
         agoraClient.current.on('user-left', (user) => {
-          console.log(`User ${user.uid} left the channel`);
-          
-          setRemoteUsers(prev => {
+            setRemoteUsers(prev => {
             const next = { ...prev };
             delete next[user.uid];
             return next;
           });
-          
-          // Update participant count
+
           updateParticipantCount();
         });
-
         // Helper function to generate device fingerprint
         const generateDeviceFingerprint = () => {
           const nav = window.navigator;
@@ -174,9 +155,6 @@ export default function VideoComponent({ roomId, onLeave }) {
         
         const data = await response.json();
 
-        console.log('Joining channel with UID:', data.uid, 'and name:', data.userName);
-
-        // Set current user info 
         setCurrentUser({
           uid: data.uid,
           name: data.userName
@@ -195,19 +173,11 @@ export default function VideoComponent({ roomId, onLeave }) {
 
         // Force a reconnection of all participants after a brief delay
         setTimeout(() => {
-          console.log("Running delayed participant check...");
-          
-          // Re-check remote users
           const currentRemoteUsers = agoraClient.current.remoteUsers;
-          console.log(`Delayed check found ${currentRemoteUsers.length} remote users`);
-          
-          // Force update participant count
+
           updateParticipantCount();
-          
-          // If we still don't see any remote users but expect to,
-          // try toggling the local tracks to trigger network activity
+
           if (currentRemoteUsers.length === 0 && participantCount > 1) {
-            console.log("No remote users found but expecting some. Refreshing local tracks...");
             if (localAudioTrack) {
               localAudioTrack.setMuted(true);
               setTimeout(() => localAudioTrack.setMuted(false), 500);
@@ -215,35 +185,28 @@ export default function VideoComponent({ roomId, onLeave }) {
           }
         }, 3000);
 
-        // IMPORTANT: Add this to detect users already in the channel
-        console.log("Checking for existing users in channel...");
         // Get existing users in the channel
         const remoteUsersInChannel = agoraClient.current.remoteUsers;
-        console.log(`Found ${remoteUsersInChannel.length} existing users in channel`);
 
         // Process any users already in the channel
         if (remoteUsersInChannel.length > 0) {
           for (const remoteUser of remoteUsersInChannel) {
-            console.log(`Processing existing user: ${remoteUser.uid}`);
             // Add to remoteUsers state
             setRemoteUsers(prev => ({
               ...prev,
-              [remoteUser.uid]: { 
+              [remoteUser.uid]: {
                 uid: remoteUser.uid,
                 name: `User-${remoteUser.uid}`,
-                hasJoined: true
-              }
+                hasJoined: true,
+              },
             }));
-            
-            // Subscribe to their media
+
             if (remoteUser.hasVideo) {
               await agoraClient.current.subscribe(remoteUser, 'video');
-              console.log(`Subscribed to existing user's video: ${remoteUser.uid}`);
             }
-            
+
             if (remoteUser.hasAudio) {
               await agoraClient.current.subscribe(remoteUser, 'audio');
-              console.log(`Subscribed to existing user's audio: ${remoteUser.uid}`);
             }
           }
           
@@ -259,9 +222,8 @@ export default function VideoComponent({ roomId, onLeave }) {
               username: data.turnServer.username,
               credential: data.turnServer.credential
             }]);
-            console.log('TURN server configured');
-          } catch (err) {
-            console.warn('Failed to set TURN server:', err);
+          } catch {
+            // Ignore TURN configuration failures
           }
         }
 
@@ -270,8 +232,8 @@ export default function VideoComponent({ roomId, onLeave }) {
           await agoraClient.current.setLocalUserAttributes({
             name: data.userName
           });
-        } catch (err) {
-          console.warn('Failed to set user attributes:', err);
+} catch {
+            // Ignore user attribute lookup errors
         }
 
         // Update the audio track creation and handling sections
@@ -279,8 +241,7 @@ export default function VideoComponent({ roomId, onLeave }) {
         // Replace the current audio track creation with this more robust approach:
         try {
           // Create audio track separately with refined settings
-          console.log('Creating audio track with enhanced settings...');
-          const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+            const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
             encoderConfig: {
               sampleRate: 48000,
               stereo: false,
@@ -293,16 +254,13 @@ export default function VideoComponent({ roomId, onLeave }) {
 
           // Force re-permission for microphone access
           try {
-            console.log('Requesting explicit microphone permission...');
             await navigator.mediaDevices.getUserMedia({ audio: true });
-            console.log('Microphone permission granted');
           } catch (permError) {
             console.error('Microphone permission error:', permError);
           }
 
           // Create video track separately
-          console.log('Creating video track...');
-          const videoTrack = await AgoraRTC.createCameraVideoTrack({
+            const videoTrack = await AgoraRTC.createCameraVideoTrack({
             encoderConfig: 'standard',
             facingMode: 'user'
           });
@@ -322,23 +280,17 @@ export default function VideoComponent({ roomId, onLeave }) {
           await videoTrack.setEnabled(true);
           
           // Publish tracks
-          console.log('Publishing tracks...');
           try {
             await agoraClient.current.publish([audioTrack, videoTrack]);
-            console.log('All tracks published successfully');
           } catch (publishError) {
             console.error('Failed to publish tracks:', publishError);
             
             // Try publishing tracks separately
             try {
-              console.log('Trying to publish audio track separately...');
               await agoraClient.current.publish(audioTrack);
-              console.log('Audio track published successfully');
               
               try {
-                console.log('Trying to publish video track separately...');
                 await agoraClient.current.publish(videoTrack);
-                console.log('Video track published successfully');
               } catch (videoError) {
                 console.error('Failed to publish video track:', videoError);
               }

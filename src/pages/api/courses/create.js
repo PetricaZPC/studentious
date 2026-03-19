@@ -86,7 +86,6 @@ export default async function handler(req, res) {
     // Copy the file to the uploads directory
     try {
       await fs.promises.copyFile(file.filepath, filePath);
-      console.log(`File saved to: ${filePath}`);
     } catch (copyError) {
       console.error('Error copying file:', copyError);
       return res.status(500).json({ message: 'Failed to copy file', error: copyError.message });
@@ -115,8 +114,6 @@ export default async function handler(req, res) {
     let result;
     try {
       result = await coursesCollection.insertOne(courseData);
-      console.log('Course created with ID:', result.insertedId.toString());
-      console.log('File stored at:', filePath);
     } catch (dbError) {
       console.error('Error inserting course data:', dbError);
       return res.status(500).json({ message: 'Failed to insert course data', error: dbError.message });

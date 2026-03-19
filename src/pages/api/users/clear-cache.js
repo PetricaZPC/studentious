@@ -18,7 +18,6 @@ export default async function handler(req, res) {
     // Clear any cached session data
     if (sessionCache.has(`session:${sessionId}`)) {
       sessionCache.delete(`session:${sessionId}`);
-      console.log('Cleared session cache for:', sessionId);
     }
 
     // Set cache control headers

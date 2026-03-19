@@ -38,7 +38,6 @@ export default async function handler(req, res) {
 
     // Then check ownership separately
     if (!course) {
-      console.log('Course not found with ID:', courseId);
       return res.status(404).json({ message: 'Course not found' });
     }
 
@@ -51,12 +50,6 @@ export default async function handler(req, res) {
       course.owner === user.email;
 
     if (!isOwner) {
-      console.log('Course found but user does not have permission');
-      console.log('Course ownership info:', {
-        courseUploadedBy: course.uploadedBy,
-        userEmail: user.email,
-        userId: user._id.toString()
-      });
       return res.status(403).json({ message: 'You do not have permission to generate audio for this course' });
     }
 
@@ -69,12 +62,10 @@ export default async function handler(req, res) {
     // Call ElevenLabs API
     // Use the dedicated ElevenLabs API key if available
     const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || process.env.GEMINI_AI_API_KEY;
-    console.log('Using API Key starting with:', ELEVENLABS_API_KEY?.substring(0, 5) + '...');
     const ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Default voice - Rachel
     
     let audioBuffer;
     try {
-      console.log('Calling ElevenLabs API...');
       const elevenLabsResponse = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
         {
@@ -118,7 +109,6 @@ export default async function handler(req, res) {
         return res.status(500).json({ message: 'Received empty audio data from ElevenLabs' });
       }
       
-      console.log('Successfully received audio data, size:', audioArrayBuffer.byteLength, 'bytes');
       audioBuffer = Buffer.from(audioArrayBuffer);
     } catch (elevenLabsError) {
       console.error('Error calling ElevenLabs API:', elevenLabsError);
@@ -146,7 +136,6 @@ export default async function handler(req, res) {
       createdAt: new Date()
     };
 
-    console.log('Storing audio in MongoDB...');
     const audioResult = await audioCollection.insertOne(audioDoc);
 
     // Update the course with reference to the audio

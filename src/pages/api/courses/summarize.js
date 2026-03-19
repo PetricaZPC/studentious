@@ -47,14 +47,11 @@ export default async function handler(req, res) {
     const coursesCollection = db.collection('courses');
 
     // Find the course
-    console.log(`Looking for course with ID: ${courseId}`);
     const course = await coursesCollection.findOne({ _id: new ObjectId(courseId) });
     if (!course) {
       console.error(`Course not found with ID: ${courseId}`);
       return res.status(404).json({ message: 'Course not found' });
     }
-
-    console.log(`Found course: ${course.name}, stored file: ${course.storedFileName || 'not available'}`);
 
     // Determine file path
     let filePath;
@@ -72,9 +69,8 @@ export default async function handler(req, res) {
     // Verify the file exists
     try {
       await fsPromises.access(filePath);
-      console.log(`File found at: ${filePath}`);
     } catch (fileError) {
-      console.error(`File not found at path: ${filePath}`);
+      console.error(`File not found at path: ${filePath}`, fileError);
       return res.status(404).json({ 
         message: 'The course file could not be found. It may have been deleted or corrupted. Please try re-uploading the file.',
         detail: 'File not found in the storage location'
@@ -102,7 +98,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'No text could be extracted from the file' });
       }
       
-      console.log(`Successfully extracted ${text.length} characters from file`);
     } catch (textError) {
       console.error('Text extraction error:', textError);
       return res.status(500).json({ 
@@ -130,7 +125,6 @@ export default async function handler(req, res) {
     try {
       // Still detect original language for informational purposes
       originalLanguage = await detectDocumentLanguage(truncatedText);
-      console.log(`Detected document language: ${originalLanguage}, generating summary in: ${outputLanguage}`);
     } catch (error) {
       console.error('Language detection error:', error);
       // Continue with requested language as default

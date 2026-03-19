@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from './api/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import Sidebar from '@/components/layout/Sidebar';
-import AuthGuard from './api/AuthGuard';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function EditAccount() {
   const { user, refreshUser } = useAuth();
@@ -115,7 +115,6 @@ export default function EditAccount() {
         updateData.photoURL = base64Image;
       }
       
-      console.log('Sending update with data:', updateData); // Debugging
       
       const response = await fetch('/api/users/update-profile', {
         method: 'POST',
@@ -126,8 +125,7 @@ export default function EditAccount() {
         credentials: 'include'
       });
       
-      const data = await response.json(); // Get the response data
-      console.log('Profile update response:', data); // Debugging
+      const data = await response.json();
       
       if (!response.ok) {
         throw new Error(data.message || 'Failed to update profile');

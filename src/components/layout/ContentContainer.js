@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/pages/api/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 
 /**
  * ContentContainer - A flexible container component that can display different types of content

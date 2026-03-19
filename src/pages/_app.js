@@ -1,19 +1,16 @@
-import { AuthProvider } from './api/context/AuthContext';
+import { AuthProvider } from '@/context/AuthContext';
 import '../styles/globals.css';
 import { useRouter } from 'next/router';
-import AuthGuard from './api/AuthGuard';
+import AuthGuard from '@/components/AuthGuard';
 import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
-// Initialize email scheduler on server side only
 if (typeof window === 'undefined') {
   import('./api/scheduler').catch(console.error);
 }
 
-// Dynamic import for AgoraRTC
 const AgoraRTC = dynamic(
   () => import('agora-rtc-sdk-ng').then(mod => {
-    // Configure Agora in development
     if (process.env.NODE_ENV === 'development') {
       mod.default.setLogLevel(1);
     }

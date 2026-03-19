@@ -3,22 +3,19 @@ import clientPromise from '../pages/api/auth/mongodb';
 import nodemailer from 'nodemailer';
 
 export async function sendScheduledEmails() {
-  console.log('Starting scheduled email sending...');
-  
   try {
     const client = await clientPromise;
     const db = client.db('accounts');
 
     // Get active users
     const users = await db.collection('users')
-      .find({ 
+      .find({
         email: { $exists: true },
-        active: true 
+        active: true,
       })
       .toArray();
 
     if (!users.length) {
-      console.log('No active users found');
       return;
     }
 
@@ -38,7 +35,6 @@ export async function sendScheduledEmails() {
       .toArray();
 
     if (!events.length) {
-      console.log('No upcoming events found');
       return;
     }
 
@@ -90,13 +86,10 @@ export async function sendScheduledEmails() {
           `
         });
 
-        console.log(`Email sent to ${user.email}: ${info.messageId}`);
       } catch (error) {
-        console.error(`Failed to send email to ${user.email}:`, error);
+        // Ignore failures for individual recipients
       }
     }
-
-    console.log('Finished sending scheduled emails');
   } catch (error) {
     console.error('Error in sendScheduledEmails:', error);
     throw error;

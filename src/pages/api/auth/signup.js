@@ -1,70 +1,69 @@
-import clientPromise from './mongodb';
+﻿import clientPromise from './mongodb';
 import { hash } from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { serialize } from 'cookie';
 import { sendWelcomeEmail } from '../../../utils/sendWelcomeEmail';
 
-export default async function handler(req, res) {
+/**
+ * Registers a new user and creates a session cookie.
+ *
+ * Expects { email, password, name } in the request body.
+ */
+export default async function signupHandler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  try {
-    const { email, password, name } = req.body;
-    
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
-    }
+  const { email, password, name } = req.body ?? {};
 
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+
+  try {
     const client = await clientPromise;
     const db = client.db('accounts');
     const users = db.collection('users');
 
-    // Check if user already exists
     const existingUser = await users.findOne({ email: email.toLowerCase() });
-    
     if (existingUser) {
       return res.status(400).json({ message: 'Email already in use' });
     }
 
-    // Hash password
     const hashedPassword = await hash(password, 10);
-    
-    // Generate a session ID
     const sessionId = uuidv4();
 
-    // Create user
     const newUser = {
       email: email.toLowerCase(),
       password: hashedPassword,
       fullName: name || '',
       createdAt: new Date(),
       sessionId,
-      intersts: [],
+      interests: [],
     };
 
-    const result = await users.insertOne(newUser);
+    await users.insertOne(newUser);
 
-    // Set cookie
     const cookie = serialize('sessionId', sessionId, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== 'development',
-      maxAge: 60 * 60 * 24 * 7, // 1 week
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
-      sameSite: 'strict'
+      sameSite: 'strict',
     });
 
     res.setHeader('Set-Cookie', cookie);
 
-    // Send welcome email after successful signup
     await sendWelcomeEmail(email, name);
-    
+
     return res.status(201).json({
       message: 'User created successfully',
       user: {
+        id: result.insertedId.toString(),
         email,
-        name
-      }
+        fullName: name || '',
+        role: 'student',
+      },
     });
   } catch (error) {
     console.error('Signup error:', error);

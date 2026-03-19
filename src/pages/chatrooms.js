@@ -4,8 +4,8 @@ import Head from 'next/head'
 import Sidebar from "@/components/layout/Sidebar"
 import ChatroomView from '@/components/chat/ChatroomView'
 import VideoChat from '@/components/chat/VideoChat'
-import { useAuth } from './api/context/AuthContext'
-import AuthGuard from './api/AuthGuard'
+import { useAuth } from '@/context/AuthContext'
+import AuthGuard from '@/components/AuthGuard'
 
 export default function Chatrooms() {
   const router = useRouter()

@@ -1,7 +1,6 @@
-import { useAuth } from "@/pages/api/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import AuthGuard from "@/pages/api/AuthGuard";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 export default function TodayEvents() {

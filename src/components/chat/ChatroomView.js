@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
-import { useAuth } from '@/pages/api/context/AuthContext'
+import { useAuth } from '@/context/AuthContext'
 import Image from 'next/image'
 
 export default function ChatroomView({ roomId }) {

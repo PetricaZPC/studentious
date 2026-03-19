@@ -1,5 +1,5 @@
-import { useAuth } from "./api/context/AuthContext";
-import AuthGuard from "./api/AuthGuard";
+import { useAuth } from '@/context/AuthContext';
+import AuthGuard from '@/components/AuthGuard';
 import Head from "next/head";
 import Sidebar from "@/components/layout/Sidebar";
 import { useEffect } from "react";

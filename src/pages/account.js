@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useAuth } from "./api/context/AuthContext";
+import { useAuth } from '@/context/AuthContext';
 import Link from "next/link";
 import { MdEdit, MdLogout, MdEvent, MdMessage, MdStar, MdSettings } from "react-icons/md"; 
 import Head from "next/head";
 import { useRouter } from 'next/router';
-import AuthGuard from './api/AuthGuard';
+import AuthGuard from '@/components/AuthGuard';
 import Layout from "../components/layout/Layout";
 import Sidebar from "../components/layout/Sidebar";
 
@@ -196,95 +196,48 @@ export default function Account() {
   };
 
   useEffect(() => {
-    if (user) {
-      const fetchCurrentUserData = async () => {
-        try {
-          // Check if we're coming from an update
-          const isUpdated = router.query.updated !== undefined;
-          
-          console.log('Account page loading, isUpdated:', isUpdated);
-          console.log('Current user from context:', user);
-          
-          if (isUpdated) {
-            // Completely fresh load of all user data
-            console.log('Performing complete user data refresh');
-            
-            // 1. Refresh auth context user data
-            const freshData = await refreshUser();
-            console.log('Fresh user data from context refresh:', freshData);
-            
-            // 2. Get profile data directly from API with cache busting
-            const timestamp = Date.now();
-            const profileResponse = await fetch(`/api/users/profile?fresh=true&t=${timestamp}`, {
-              credentials: 'include',
-              headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-              }
-            });
-            
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json();
-              console.log('Fresh profile data from API:', profileData);
-              
-              // 3. Set current user from BOTH data sources
-              setCurrentUser({
-                ...user,
-                ...(freshData || {}),
-                ...profileData
-              });
-              
-              // Set profile image if available
-              if (profileData.photoURL) {
-                setProfileImage(profileData.photoURL);
-              }
+    if (!user) return;
 
-              console.log('Updated local state with combined data');
-            }
-            
-            // 4. Remove the updated parameter to prevent future refreshes, but keep the page
-            const { updated, ...restQuery } = router.query;
-            router.replace(
-              { pathname: router.pathname, query: restQuery }, 
-              undefined, 
-              { shallow: true }
-            );
-          } else {
-            // Normal page load - refresh data once anyway
-            console.log('Normal page load - setting currentUser from context');
-            
-            // Still fetch fresh data, but less aggressively
-            const profileResponse = await fetch('/api/users/profile', {
-              credentials: 'include'
-            });
-            
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json();
-              
-              setCurrentUser({
-                ...user,
-                ...profileData
-              });
-              
-              if (profileData.photoURL) {
-                setProfileImage(profileData.photoURL);
-              }
-            } else {
-              // Fallback to just user context
-              setCurrentUser(user);
-            }
-          }
-        } catch (error) {
-          console.error('Error refreshing user data:', error);
-          // Fallback to just using the context user
-          setCurrentUser(user);
+    const refreshProfileData = async (forceRefresh = false) => {
+      try {
+        if (forceRefresh) {
+          await refreshUser();
         }
-      };
-      
-      fetchCurrentUserData();
-    }
-  }, [user, router.query.updated, refreshUser, router]);
+
+        const profileResponse = await fetch('/api/users/profile', {
+          credentials: 'include',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+        });
+
+        if (!profileResponse.ok) {
+          setCurrentUser(user);
+          return;
+        }
+
+        const profileData = await profileResponse.json();
+        setCurrentUser({ ...user, ...profileData });
+
+        if (profileData.photoURL) {
+          setProfileImage(profileData.photoURL);
+        }
+      } catch (error) {
+        console.error('Error refreshing user data:', error);
+        setCurrentUser(user);
+      }
+    };
+
+    const isUpdated = router.query.updated !== undefined;
+    refreshProfileData(isUpdated).finally(() => {
+      if (isUpdated) {
+        const { updated, ...rest } = router.query;
+        router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+      }
+    });
+  }, [user, router, router.query.updated, refreshUser]);
 
   useEffect(() => {
     if (!user) {

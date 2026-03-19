@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { IoDocument, IoSparkles, IoWarning, IoCalendar, IoEye, IoSearch, IoClose } from 'react-icons/io5';
 import { BsTranslate } from 'react-icons/bs';
-import { useAuth } from '@/pages/api/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function PublicCoursesContent() {
   const { user } = useAuth();

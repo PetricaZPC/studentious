@@ -1,33 +1,39 @@
 import clientPromise from './mongodb';
 
-export default async function handler(req, res) {
+/**
+ * Validates the current session and returns basic user information.
+ *
+ * Requires a valid sessionId cookie.
+ */
+export default async function checkAuthHandler(req, res) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ message: "Method not allowed" });
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  const sessionId = req.cookies.sessionId;
+  if (!sessionId) {
+    return res.status(401).json({ message: 'Not authenticated' });
   }
 
   try {
-    const sessionId = req.cookies.sessionId;
-    if (!sessionId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
     const client = await clientPromise;
-    const db = client.db('accounts'); 
-    const users = db.collection('users'); 
+    const db = client.db('accounts');
+    const users = db.collection('users');
 
     const user = await users.findOne({ sessionId });
     if (!user) {
-      return res.status(401).json({ message: "Not authenticated" });
+      return res.status(401).json({ message: 'Not authenticated' });
     }
 
-    // Return user info (but not password)
-    res.status(200).json({ 
-      message: "Authenticated", 
+    res.status(200).json({
+      message: 'Authenticated',
+      id: user._id.toString(),
       email: user.email,
-      fullName: user.fullName || ''
+      fullName: user.fullName || '',
+      role: user.role || 'student',
     });
   } catch (error) {
     console.error('Auth check error:', error);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: 'Server error' });
   }
 }

@@ -22,7 +22,6 @@ export async function sendWelcomeEmail(userEmail, userName) {
       html: getWelcomeEmailTemplate(userName || userEmail.split('@')[0])
     });
 
-    console.log(`Welcome email sent to ${userEmail}: ${info.messageId}`);
     return true;
   } catch (error) {
     console.error('Error sending welcome email:', error);

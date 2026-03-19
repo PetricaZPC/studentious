@@ -9,8 +9,6 @@ export default async function handler(req, res) {
   try {
     const audioId = req.query.id;
     
-    console.log('Audio request for ID:', audioId);
-    
     if (!audioId || !ObjectId.isValid(audioId)) {
       console.error('Invalid audio ID format:', audioId);
       return res.status(400).json({ message: 'Invalid audio ID' });
@@ -20,7 +18,6 @@ export default async function handler(req, res) {
     const db = client.db('accounts');
     const audioCollection = db.collection('course_audio');
     
-    console.log('Looking for audio document with ID:', audioId);
     const audioDoc = await audioCollection.findOne({ _id: new ObjectId(audioId) });
     
     if (!audioDoc) {
@@ -28,7 +25,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: 'Audio not found' });
     }
     
-    console.log('Found audio document, type:', typeof audioDoc.audio);
     
     // Set proper headers for audio streaming
     res.setHeader('Content-Type', 'audio/mpeg');
@@ -46,22 +42,15 @@ export default async function handler(req, res) {
       return res.status(500).json({ message: 'Audio data is missing' });
     }
     
-    // Send appropriate response based on audio data format
+    // Send audio response based on detected format
     try {
       if (audioDoc.audio.buffer) {
-        console.log('Sending audio from buffer property');
         res.end(audioDoc.audio.buffer);
-      } 
-      else if (Buffer.isBuffer(audioDoc.audio)) {
-        console.log('Sending audio as direct Buffer');
+      } else if (Buffer.isBuffer(audioDoc.audio)) {
         res.end(audioDoc.audio);
-      }
-      else if (typeof audioDoc.audio === 'object' && audioDoc.audio.type === 'Buffer') {
-        console.log('Sending audio from object with Buffer type');
+      } else if (typeof audioDoc.audio === 'object' && audioDoc.audio.type === 'Buffer') {
         res.end(Buffer.from(audioDoc.audio.data));
-      }
-      else {
-        console.log('Converting audio with generic Buffer.from, type:', typeof audioDoc.audio);
+      } else {
         res.end(Buffer.from(audioDoc.audio));
       }
     } catch (bufferError) {

@@ -69,8 +69,6 @@ export default async function handler(req, res) {
     }
     */
     
-    console.log('Sending profile data with fullName:', user.fullName); // Add this log
-    
     return res.status(200).json({
       fullName: user.fullName || '', 
       email: user.email,

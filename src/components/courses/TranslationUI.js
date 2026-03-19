@@ -30,37 +30,29 @@ export default function TranslationUI({ courseId, summary, detectedLanguage, onT
     
     setIsTranslating(true);
     setError('');
-    
+
     try {
-      console.log('Requesting translation to:', selectedLanguage);
-      
       const response = await fetch('/api/courses/translate-summary', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           courseId,
-          targetLanguage: selectedLanguage 
+          targetLanguage: selectedLanguage,
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
-        console.error('Translation API error:', data);
         throw new Error(data.message || data.error || 'Failed to translate summary');
       }
-      
-      console.log('Translation successful');
-      
-      // Call the parent component's callback with the translated summary
+
       if (onTranslated) {
         onTranslated(data.translatedSummary, selectedLanguage);
       }
-      
     } catch (err) {
-      console.error('Translation error:', err);
       setError(err.message || 'An error occurred during translation');
     } finally {
       setIsTranslating(false);

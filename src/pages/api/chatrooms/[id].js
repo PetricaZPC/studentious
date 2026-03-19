@@ -1,30 +1,28 @@
-import connectDB from '@/utils/connectDB'
+﻿import connectDB from '@/utils/connectDB'
 import Chatroom from '@/models/Chatroom'
-import { getToken } from "next-auth/jwt"
+import { getUserFromSession } from '@/utils/session';
 
 export default async function handler(req, res) {
-  // Get chatroom ID from URL
-  const { id } = req.query
-  
+  const { id } = req.query;
   if (!id) {
-    return res.status(400).json({ message: "Chatroom ID is required" })
+    return res.status(400).json({ message: 'Chatroom ID is required' });
   }
-  
-  // Simple authentication (same as in index.js)
-  let userId = 'dev-user-id' // For development testing
-  
+
+  const sessionUser = await getUserFromSession(req);
+  if (!sessionUser) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
   try {
-    await connectDB()
-    
+    await connectDB();
+
     if (req.method === 'GET') {
-      // Get a single chatroom
-      const chatroom = await Chatroom.findById(id)
-      
+      const chatroom = await Chatroom.findById(id);
       if (!chatroom) {
-        return res.status(404).json({ message: "Chatroom not found" })
+        return res.status(404).json({ message: 'Chatroom not found' });
       }
-      
-      return res.status(200).json({ 
+
+      return res.status(200).json({
         chatroom: {
           id: chatroom._id.toString(),
           name: chatroom.name,
@@ -33,16 +31,14 @@ export default async function handler(req, res) {
           isPublic: chatroom.isPublic,
           participants: chatroom.participants?.length || 1,
           createdBy: chatroom.createdBy,
-          createdAt: chatroom.createdAt
-        } 
-      })
+          createdAt: chatroom.createdAt,
+        },
+      });
     }
-    
-    // Handle other methods like PUT for updates and DELETE
-    
-    return res.status(405).json({ message: "Method not allowed" })
+
+    return res.status(405).json({ message: 'Method not allowed' });
   } catch (error) {
-    console.error(`Error in chatroom/${id} API:`, error)
-    return res.status(500).json({ message: "Server error" })
+    console.error('Error in chatroom/[id] API:', error);
+    return res.status(500).json({ message: 'Server error' });
   }
 }

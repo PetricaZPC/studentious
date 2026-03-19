@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/pages/api/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { IoClose, IoDocument, IoVolumeHigh, IoPause, IoPlay, IoCheckmarkCircle, IoWarning, IoCalendar, IoTime, IoEye, IoCloudDownload, IoSparkles, IoMenu } from 'react-icons/io5';
 import { BsTranslate } from 'react-icons/bs';
 
@@ -164,8 +164,6 @@ export default function CoursesContent() {
     setError('');
     
     try {
-      // Log the request for debugging
-      console.log('Sending summary request for courseId:', courseId);
 
       // API call with proper error handling
       const response = await fetch('/api/courses/summarize', {
@@ -191,7 +189,6 @@ export default function CoursesContent() {
         throw new Error(data.message || data.error || 'Summary generation failed');
       }
       
-      console.log('Summary generated successfully:', data.summary.substring(0, 100) + '...');
       
       // Update the course in your UI state
       setCourses(prevCourses => 
@@ -317,7 +314,6 @@ export default function CoursesContent() {
       
       audioRef.current.play()
         .then(() => {
-          console.log('Audio playback started successfully');
         })
         .catch(err => {
           console.error('Error playing audio:', err);
@@ -890,7 +886,6 @@ export default function CoursesContent() {
                         AI Summary: {viewingSummary.name}
                       </h3>
                       
-                      {/* Add this new language selector */}
                       {viewingSummary.summarized && (
                         <div className="flex items-center mt-2 sm:mt-0 space-x-2">
                           <select

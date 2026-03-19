@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/pages/api/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { IoClose, IoDocument, IoVolumeHigh, IoPause, IoPlay, IoCheckmarkCircle, IoWarning, IoCalendar, IoTime, IoEye, IoCloudDownload, IoSparkles } from 'react-icons/io5';
 import { BsTranslate } from 'react-icons/bs';
 import CourseViewer from './CourseViewer';
@@ -83,8 +83,6 @@ export default function PersonalCoursesContent() {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      console.log('File selected:', selectedFile.name, selectedFile.type);
-      
       // Validate file size (5MB limit)
       if (selectedFile.size > 5 * 1024 * 1024) {
         setError('File size exceeds 5MB limit');
@@ -194,7 +192,6 @@ export default function PersonalCoursesContent() {
 
   // View a specific course (document)
   const viewCourse = (course) => {
-    console.log("Opening course viewer for:", course.name, course.fileUrl);
     setViewingCourse(course);
   };
   
@@ -218,7 +215,6 @@ export default function PersonalCoursesContent() {
     setError('');
 
     try {
-      console.log('Sending summary request for courseId:', courseId, 'with options:', options);
 
       const response = await fetch('/api/courses/summarize', {
         method: 'POST',
@@ -244,7 +240,6 @@ export default function PersonalCoursesContent() {
         throw new Error(data.message || data.error || 'Summary generation failed');
       }
       
-      console.log('Summary generated successfully:', data.summary.substring(0, 100) + '...');
       
       // Update the course in your UI state
       setCourses(prevCourses => 
@@ -347,7 +342,6 @@ export default function PersonalCoursesContent() {
       setTimeout(() => setShowSuccessAnimation(false), 300);
       
     } catch (err) {
-      console.error('Error generating audio:', err);
       setError(err.message || 'Failed to generate audio');
     } finally {
       setIsGeneratingAudio(false);
@@ -380,8 +374,7 @@ export default function PersonalCoursesContent() {
       
       audioRef.current.play().then(() => {
         setCurrentlyPlaying(course._id);
-      }).catch(err => {
-        console.error('Error playing audio:', err);
+      }).catch(() => {
         setError('Failed to play audio');
       });
     }
@@ -414,7 +407,6 @@ export default function PersonalCoursesContent() {
     setTranslatingCourseId(course._id);
     
     try {
-      console.log('Translating to:', targetLanguage);
       
       const response = await fetch('/api/courses/translate-summary', {
         method: 'POST',

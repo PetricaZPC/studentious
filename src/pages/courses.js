@@ -4,7 +4,7 @@ import Sidebar from '../components/layout/Sidebar';
 import PublicCoursesContent from '../components/courses/PublicCoursesContent';
 import PersonalCoursesContent from '../components/courses/PersonalCoursesContent';
 import { Tab } from '@headlessui/react';
-import { useAuth } from '@/pages/api/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Courses() {
   const { user } = useAuth();

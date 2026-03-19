@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from "@/pages/api/context/AuthContext";
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from "next/router";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { usePathname } from 'next/navigation';

@@ -1,37 +1,14 @@
 import connectDB from '@/utils/connectDB'
 import Chatroom from '@/models/Chatroom'
-import { getToken } from "next-auth/jwt"
+import { getUserFromSession } from '@/utils/session';
 
 export default async function handler(req, res) {
-  // Simplified authentication that works even if next-auth isn't fully set up
-  let userId = null
-  
-  try {
-    // First try to get the token through next-auth
-    const token = await getToken({ req })
-    if (token) {
-      userId = token.id || token.sub
-    } 
-    // Fallback: check for Authorization header
-    else if (req.headers.authorization) {
-      const authToken = req.headers.authorization.split(' ')[1]
-      // Simple check - in a real app you'd verify this token
-      if (authToken) {
-        userId = 'demo-user-id' // Placeholder for testing
-      }
-    }
-    
-    // For development - allow basic testing without auth
-    if (!userId && process.env.NODE_ENV === 'development') {
-      userId = 'dev-user-id'
-    }
-  } catch (err) {
-    console.error('Auth error:', err)
-    // In dev mode, proceed with a test user ID
-    if (process.env.NODE_ENV === 'development') {
-      userId = 'dev-user-id'
-    }
+  const sessionUser = await getUserFromSession(req);
+  if (!sessionUser) {
+    return res.status(401).json({ message: 'Authentication required' });
   }
+
+  const userId = sessionUser._id.toString();
   
   // Connect to the database
   try {

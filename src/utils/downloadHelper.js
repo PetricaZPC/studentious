@@ -4,8 +4,6 @@
  */
 export const downloadFile = async (url, filename) => {
   try {
-    console.log(`Downloading file from ${url} as ${filename}`);
-    
     // Add a timestamp to bust cache
     const timestampedUrl = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`;
     

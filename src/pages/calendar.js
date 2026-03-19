@@ -4,7 +4,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/router'
-import { useAuth } from './api/context/AuthContext'
+import { useAuth } from '@/context/AuthContext'
 import {
   add,
   eachDayOfInterval,
@@ -19,7 +19,7 @@ import {
   parseISO,
   startOfToday,
 } from 'date-fns'
-import AuthGuard from './api/AuthGuard';
+import AuthGuard from '@/components/AuthGuard';
 import Sidebar from '@/components/layout/Sidebar'
 
 // Import headlessui components dynamically
