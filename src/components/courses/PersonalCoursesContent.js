@@ -544,7 +544,7 @@ export default function PersonalCoursesContent() {
                     type="text"
                     value={courseName}
                     onChange={(e) => setCourseName(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-400 text-black placeholder-black focus:ring-2 focus:ring-indigo-500 focus:border-black transition duration-200"
                     placeholder="Enter course name"
                   />
                 </div>

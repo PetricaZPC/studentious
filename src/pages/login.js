@@ -70,7 +70,7 @@ export default function Login() {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-400 text-black placeholder-black focus:ring-2 focus:ring-purple-500 focus:border-black transition-all"
                   placeholder="John Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -90,7 +90,7 @@ export default function Login() {
               <input
                 type="email"
                 required
-                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-400 text-black placeholder-black focus:ring-2 focus:ring-purple-500 focus:border-black transition-all"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -114,7 +114,7 @@ export default function Login() {
               <input
                 type="password"
                 required
-                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-400 text-black placeholder-black focus:ring-2 focus:ring-purple-500 focus:border-black transition-all"
                 placeholder={isLoginForm ? 'Enter your password' : 'Create a password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

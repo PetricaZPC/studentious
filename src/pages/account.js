@@ -131,7 +131,7 @@ function BecomeTeacher({ user, onSuccess }) {
                 type="password"
                 value={teacherPassword}
                 onChange={(e) => setTeacherPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="w-full px-3 py-2 border border-gray-400 text-black placeholder-black rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-black"
                 placeholder="Enter teacher password"
                 required
               />
@@ -152,7 +152,7 @@ function BecomeTeacher({ user, onSuccess }) {
               <button
                 type="button"
                 onClick={() => setShowTeacherForm(false)}
-                className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+                className="px-3 py-1.5 border border-gray-400 text-black rounded-md hover:bg-gray-100 text-sm"
               >
                 Cancel
               </button>
