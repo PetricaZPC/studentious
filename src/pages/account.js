@@ -632,7 +632,7 @@ export default function Account() {
       
       <Layout>
         <Sidebar />
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-50">
+        <div className="flex-1 p-4 sm:p-6 md:pl-64 overflow-y-auto bg-gray-50">
           <AccountContent />
         </div>
       </Layout>

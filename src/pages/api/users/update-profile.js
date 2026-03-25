@@ -20,7 +20,7 @@ export default async function updateUserProfileHandler(req, res) {
 
   try {
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
     const usersCollection = db.collection('users');
 
     const existingUser = await usersCollection.findOne({ sessionId });

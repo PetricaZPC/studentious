@@ -8,7 +8,7 @@ export default async function handler(req, res) {
 
   try {
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
 
     const users = await db.collection('users').find({
       email: { $exists: true }

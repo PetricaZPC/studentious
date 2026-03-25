@@ -5,7 +5,7 @@ import nodemailer from 'nodemailer';
 export async function sendScheduledEmails() {
   try {
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
 
     // Get active users
     const users = await db.collection('users')

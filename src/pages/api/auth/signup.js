@@ -22,7 +22,7 @@ export default async function signupHandler(req, res) {
 
   try {
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
     const users = db.collection('users');
 
     const existingUser = await users.findOne({ email: email.toLowerCase() });
@@ -42,7 +42,7 @@ export default async function signupHandler(req, res) {
       interests: [],
     };
 
-    await users.insertOne(newUser);
+    const insertResult = await users.insertOne(newUser);
 
     const cookie = serialize('sessionId', sessionId, {
       httpOnly: true,
@@ -59,7 +59,7 @@ export default async function signupHandler(req, res) {
     return res.status(201).json({
       message: 'User created successfully',
       user: {
-        id: result.insertedId.toString(),
+        id: insertResult.insertedId.toString(),
         email,
         fullName: name || '',
         role: 'student',

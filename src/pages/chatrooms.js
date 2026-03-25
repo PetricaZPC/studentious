@@ -17,6 +17,11 @@ export default function Chatrooms() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeCategoryTab, setActiveCategoryTab] = useState('all')
+  const [newRoomName, setNewRoomName] = useState('')
+  const [newRoomType, setNewRoomType] = useState('General')
+  const [newRoomDescription, setNewRoomDescription] = useState('')
+  const [newRoomPublic, setNewRoomPublic] = useState(true)
+  const [creationMessage, setCreationMessage] = useState('')
   
   // Fetch available chatrooms
   useEffect(() => {
@@ -350,12 +355,19 @@ export default function Chatrooms() {
               </div>
               
               <div className="p-6">
+                {creationMessage && (
+                  <div className="mb-4 rounded-lg px-3 py-2 text-sm font-medium text-green-700 bg-green-100">
+                    {creationMessage}
+                  </div>
+                )}
                 <div className="mb-4">
                   <label htmlFor="chatroomName" className="block text-sm font-medium text-gray-700 mb-1">Chatroom Name*</label>
                   <input
                     id="chatroomName"
                     type="text"
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
                     placeholder="Enter chatroom name"
                     required
                   />
@@ -365,7 +377,9 @@ export default function Chatrooms() {
                   <label htmlFor="chatroomType" className="block text-sm font-medium text-gray-700 mb-1">Chatroom Type</label>
                   <select
                     id="chatroomType"
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                    value={newRoomType}
+                    onChange={(e) => setNewRoomType(e.target.value)}
+                    className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
                   >
                     <option value="General">General</option>
                     <option value="Course">Course</option>
@@ -378,7 +392,9 @@ export default function Chatrooms() {
                   <label htmlFor="chatroomDescription" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     id="chatroomDescription"
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                    value={newRoomDescription}
+                    onChange={(e) => setNewRoomDescription(e.target.value)}
+                    className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
                     placeholder="What's this chatroom about?"
                     rows={3}
                   />
@@ -388,8 +404,9 @@ export default function Chatrooms() {
                   <label className="flex items-center">
                     <input
                       type="checkbox"
+                      checked={newRoomPublic}
+                      onChange={(e) => setNewRoomPublic(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      defaultChecked
                     />
                     <span className="ml-2 text-sm text-gray-700">Public Chatroom</span>
                   </label>
@@ -406,9 +423,56 @@ export default function Chatrooms() {
                   <button
                     type="button"
                     className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
-                    onClick={() => {
-                      // Handle creation logic
-                      setShowCreateModal(false)
+                    onClick={async () => {
+                      if (!newRoomName.trim()) {
+                        setCreationMessage('Please enter a chatroom name.')
+                        return
+                      }
+
+                      try {
+                        const createResponse = await fetch('/api/chatrooms', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            name: newRoomName,
+                            type: newRoomType,
+                            description: newRoomDescription,
+                            isPublic: newRoomPublic
+                          })
+                        })
+
+                        const created = await createResponse.json()
+
+                        if (!createResponse.ok) {
+                          setCreationMessage(created.message || 'Failed to create chatroom')
+                          return
+                        }
+
+                        setChatrooms(prev => [
+                          ...prev,
+                          {
+                            id: created.chatroom.id,
+                            name: created.chatroom.name,
+                            type: created.chatroom.type,
+                            lastMessage: null,
+                            unreadCount: 0,
+                            participants: [user?.uid]
+                          }
+                        ])
+
+                        setCreationMessage('Chatroom created successfully.')
+                        setNewRoomName('')
+                        setNewRoomDescription('')
+                        setNewRoomType('General')
+                        setNewRoomPublic(true)
+                        setShowCreateModal(false)
+
+                        // Optionally navigate to new room
+                        router.push(`/chatrooms?roomId=${created.chatroom.id}`)
+                      } catch (err) {
+                        console.error('Error creating chatroom:', err)
+                        setCreationMessage('Error creating chatroom, please try again.')
+                      }
                     }}
                   >
                     Create Chatroom

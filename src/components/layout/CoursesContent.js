@@ -950,10 +950,16 @@ export default function CoursesContent() {
                           const translatedSummary = viewingSummary.translations?.[selectedLanguage]?.summary;
                           
                           // Use original summary as fallback
-                          const summaryToShow = (selectedLanguage === viewingSummary.detectedLanguage || !translatedSummary)
-                            ? viewingSummary.summary
+                          const originalSummary = viewingSummary.summary || '';
+                          const summaryToShowRaw = (selectedLanguage === viewingSummary.detectedLanguage || !translatedSummary)
+                            ? originalSummary
                             : translatedSummary;
-                          
+                          const summaryToShow = (summaryToShowRaw || '').toString();
+
+                          if (!summaryToShow.trim()) {
+                            return <p className="text-gray-500 italic">No summary available for this course.</p>;
+                          }
+
                           // Render the summary
                           return summaryToShow.split('\n').map((line, i) => (
                             line.startsWith('##') ? (

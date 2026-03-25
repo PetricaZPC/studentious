@@ -19,6 +19,13 @@ body {
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
+input,
+textarea,
+select {
+  color: #111827; /* ensure high contrast text */
+  background-color: #ffffff;
+}
+
 /* To fix modal scrolling issues */
 .modal-scroll {
   max-height: 80vh;

@@ -27,7 +27,7 @@ const ChatroomSchema = new mongoose.Schema({
   description: String,
   type: {
     type: String,
-    enum: ['Event', 'Course', 'General'],
+    enum: ['Event', 'Course', 'General', 'Study Group'],
     default: 'General'
   },
   eventId: {
