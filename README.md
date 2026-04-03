@@ -1,5 +1,7 @@
 # 🧑‍🎓 Studentious - Next-Gen Educational Platform
 
+<br>
+
 <p align="center">
   A comprehensive full-stack educational platform built with Next.js and MongoDB. Studentious goes beyond a traditional LMS by integrating AI-driven course summarization, text-to-speech functionality, and real-time video/text collaboration.
 </p>
@@ -7,7 +9,7 @@
 ## 📱 Screenshots & Demo
 
 <p align="center">
-  A visual tour of the Studentious platform, showing the dashboard, course materials, and collaboration features.
+  A visual tour of the Studentious platform, showing the dashboard, course materials, and collaboration features.
 </p>
 
 <table border="0">
