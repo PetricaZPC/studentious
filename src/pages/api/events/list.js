@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
     // Get user from session
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
     const usersCollection = db.collection('users');
     
     const user = await usersCollection.findOne({ sessionId });

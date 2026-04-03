@@ -2,6 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function TodayEvents() {
   const { user } = useAuth();

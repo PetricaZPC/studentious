@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     }
 
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
     
     // Create GridFS bucket
     const bucket = new GridFSBucket(db);

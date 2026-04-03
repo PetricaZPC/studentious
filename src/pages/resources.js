@@ -1,17 +1,14 @@
-import { useAuth } from '@/context/AuthContext';
-import AuthGuard from '@/components/AuthGuard';
-import Head from "next/head";
-import Sidebar from "@/components/layout/Sidebar";
-import { useEffect } from "react";
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 export default function Resources() {
-    const [Resources, setResources] = useState([]);
-    const { user } = useAuth();
-   
+  const router = useRouter();
 
-    return (
-        <AuthGuard>
+  useEffect(() => {
+    // Resources page is removed by request.
+    // Redirect users back to dashboard (or another page) to prevent invalid UI.
+    router.replace('/');
+  }, [router]);
 
-        </AuthGuard>  
-  );
+  return null;
 }

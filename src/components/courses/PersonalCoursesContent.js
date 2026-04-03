@@ -544,7 +544,7 @@ export default function PersonalCoursesContent() {
                     type="text"
                     value={courseName}
                     onChange={(e) => setCourseName(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-400 text-black placeholder-black focus:ring-2 focus:ring-indigo-500 focus:border-black transition duration-200"
                     placeholder="Enter course name"
                   />
                 </div>
@@ -687,7 +687,7 @@ export default function PersonalCoursesContent() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {courses.map(course => (
                     <div 
                       key={course._id} 
@@ -784,6 +784,13 @@ export default function PersonalCoursesContent() {
                                 <IoTime className="h-3 w-3 mr-1.5" />
                                 <span>Generated: {course.audioGeneratedAt ? new Date(course.audioGeneratedAt).toLocaleString() : 'Recently'}</span>
                               </div>
+                              {currentlyPlaying === course._id && (
+                                <div className="mt-3 p-3 bg-white/50 rounded-lg">
+                                  <p className="text-xs text-blue-800 line-clamp-4">
+                                    {course.summarized ? course.summary : course.description}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1013,10 +1020,17 @@ export default function PersonalCoursesContent() {
                       const translatedSummary = viewingSummary.translations?.[selectedLanguage]?.summary;
                       
                       // Use original summary as fallback
-                      const summaryToShow = (selectedLanguage === viewingSummary.detectedLanguage || !translatedSummary)
-                        ? viewingSummary.summary
+                      const originalSummary = viewingSummary.summary || '';
+                      const summaryToShowRaw = (selectedLanguage === viewingSummary.detectedLanguage || !translatedSummary)
+                        ? originalSummary
                         : translatedSummary;
-                      
+                      const summaryToShow = (summaryToShowRaw || '').toString();
+
+                      // If there's no summary, render a placeholder message
+                      if (!summaryToShow.trim()) {
+                        return <p className="text-gray-500 italic">No summary available for this course.</p>;
+                      }
+
                       // Render the summary
                       return summaryToShow.split('\n').map((line, i) => (
                         line.startsWith('##') ? (

@@ -18,7 +18,7 @@ export default async function logoutHandler(req, res) {
 
   try {
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
     const users = db.collection('users');
 
     await users.updateOne({ sessionId }, { $unset: { sessionId: '' } });

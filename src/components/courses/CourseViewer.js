@@ -49,10 +49,10 @@ export default function CourseViewer({ course, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto bg-gray-900 bg-opacity-75 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 overflow-auto bg-gray-900 bg-opacity-75 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl sm:max-w-3xl md:max-w-4xl lg:max-w-5xl flex flex-col max-h-[95vh]">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <h3 className="text-xl font-bold flex items-center">
             <IoDocument className="h-5 w-5 mr-2" />
             {course.name} 
@@ -86,7 +86,7 @@ export default function CourseViewer({ course, onClose }) {
         </div>
         
         {/* Content */}
-        <div className="p-0 flex-grow overflow-hidden relative bg-gray-50">
+        <div className="p-0 flex-grow overflow-auto relative bg-gray-50">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-96">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
@@ -148,25 +148,46 @@ export default function CourseViewer({ course, onClose }) {
               
               {/* Show a small preview for PDFs if possible */}
               {isViewablePdf && (
-                <div className="border border-gray-300 rounded-lg shadow-sm overflow-hidden w-full max-w-lg mx-auto" style={{maxHeight: '300px'}}>
-                  <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 text-sm text-gray-700 font-medium flex justify-between items-center">
-                    <span>PDF Preview (first page)</span>
-                    <button
-                      onClick={openInNewTab}
-                      className="text-blue-600 hover:text-blue-800 text-xs"
+                <>
+                  <div className="border border-gray-300 rounded-lg shadow-sm overflow-hidden w-full max-w-xs sm:max-w-md mx-auto" style={{maxHeight: '300px'}}>
+                    <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 text-sm text-gray-700 font-medium flex justify-between items-center">
+                      <span>PDF Preview (first page)</span>
+                      <button
+                        onClick={openInNewTab}
+                        className="text-blue-600 hover:text-blue-800 text-xs"
+                      >
+                        View Full
+                      </button>
+                    </div>
+                    <object
+                      data={`${viewUrl}#page=1&view=FitH`}
+                      type="application/pdf"
+                      className="w-full h-64"
+                      onLoad={() => setIsLoading(false)}
                     >
-                      View Full
-                    </button>
+                      <p>Your browser doesn't support PDF previews.</p>
+                    </object>
                   </div>
-                  <object
-                    data={`${viewUrl}#page=1&view=FitH`}
-                    type="application/pdf"
-                    className="w-full h-64"
-                    onLoad={() => setIsLoading(false)}
-                  >
-                    <p>Your browser doesn't support PDF previews.</p>
-                  </object>
-                </div>
+                  {/* Full PDF viewer below preview */}
+                  <div className="mt-8 border border-gray-300 rounded-lg shadow-sm overflow-hidden w-full max-w-xs sm:max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto" style={{height: '60vh'}}>
+                    <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 text-sm text-gray-700 font-medium flex justify-between items-center">
+                      <span>Full PDF Viewer</span>
+                      <button
+                        onClick={openInNewTab}
+                        className="text-blue-600 hover:text-blue-800 text-xs"
+                      >
+                        Open in New Tab
+                      </button>
+                    </div>
+                    <iframe
+                      src={viewUrl}
+                      title="PDF Viewer"
+                      className="w-full h-full"
+                      style={{minHeight: '60vh', border: 'none'}}
+                      onLoad={() => setIsLoading(false)}
+                    />
+                  </div>
+                </>
               )}
               
               {/* Show image preview directly */}

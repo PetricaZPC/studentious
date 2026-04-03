@@ -36,8 +36,8 @@ export default function Login() {
   <Head>
     <title>{isLoginForm ? 'Login' : 'Sign Up'} | Studentious</title>
   </Head>
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
-    <div className="max-w-md w-full space-y-8">
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 py-8 px-2 sm:px-6 lg:px-8">
+    <div className="w-full max-w-xs sm:max-w-md space-y-8">
       <div className="text-center">
         <div className="mx-auto h-16 w-16 bg-gradient-to-r from-purple-600 to-blue-500 rounded-lg flex items-center justify-center shadow-lg mb-6">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -70,7 +70,7 @@ export default function Login() {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-400 text-black placeholder-black focus:ring-2 focus:ring-purple-500 focus:border-black transition-all"
                   placeholder="John Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -90,7 +90,7 @@ export default function Login() {
               <input
                 type="email"
                 required
-                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-400 text-black placeholder-black focus:ring-2 focus:ring-purple-500 focus:border-black transition-all"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -114,7 +114,7 @@ export default function Login() {
               <input
                 type="password"
                 required
-                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-400 text-black placeholder-black focus:ring-2 focus:ring-purple-500 focus:border-black transition-all"
                 placeholder={isLoginForm ? 'Enter your password' : 'Create a password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     }
 
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
     const usersCollection = db.collection('users');
     
     const user = await usersCollection.findOne({ sessionId });
@@ -94,6 +94,7 @@ export default async function handler(req, res) {
     // Store course information in the database
     const coursesCollection = db.collection('courses');
     
+    const isPublicField = fields.isPublic?.[0];
     const courseData = {
       name,
       description: fields.description?.[0] || '',
@@ -107,7 +108,7 @@ export default async function handler(req, res) {
       userId: user._id.toString(),
       createdAt: new Date(),
       summarized: false,
-      isPublic: fields.isPublic?.[0] === 'true'
+      isPublic: isPublicField === 'true' || isPublicField === true || isPublicField === 'on'
     };
 
     // Insert course data

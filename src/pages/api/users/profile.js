@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     let user;
     
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
     
     if (cachedUser) {
       user = cachedUser;

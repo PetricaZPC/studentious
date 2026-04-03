@@ -17,7 +17,7 @@ export default async function getCurrentUserHandler(req, res) {
 
   try {
     const client = await clientPromise;
-    const db = client.db('accounts');
+    const db = client.db(process.env.MONGODB_DB_NAME || 'studentious');
     const users = db.collection('users');
 
     const user = await users.findOne({ sessionId });

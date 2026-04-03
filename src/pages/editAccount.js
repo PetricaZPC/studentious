@@ -220,7 +220,7 @@ export default function EditAccount() {
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full px-3 py-2 border border-gray-400 text-black placeholder-black rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-black"
                   placeholder="Enter your display name"
                 />
               </div>
@@ -228,7 +228,7 @@ export default function EditAccount() {
                   type="text"
                   value={interests}
                   onChange={(e) => setInterests(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full px-3 py-2 border border-gray-400 text-black placeholder-black rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-black"
                   placeholder="Enter your interests"/>
               <div className="flex items-center justify-between mt-6">
                 <button

@@ -119,7 +119,7 @@ export default function SummarizeOptionsModal({ course, onClose, onSubmit }) {
             
             {/* Output Language */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
                 <IoEarth className="h-4 w-4 mr-1.5 text-indigo-500" />
                 Output Language
               </label>
@@ -155,7 +155,7 @@ export default function SummarizeOptionsModal({ course, onClose, onSubmit }) {
                   <input
                     id="focus-concepts"
                     type="checkbox"
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-black focus:ring-indigo-500 border-black rounded"
                     checked={summarizeOptions.focusAreas.includes('concepts')}
                     onChange={() => handleFocusAreaToggle('concepts')}
                   />
@@ -167,7 +167,7 @@ export default function SummarizeOptionsModal({ course, onClose, onSubmit }) {
                   <input
                     id="focus-definitions"
                     type="checkbox"
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-black focus:ring-indigo-500 border-black rounded"
                     checked={summarizeOptions.focusAreas.includes('definitions')}
                     onChange={() => handleFocusAreaToggle('definitions')}
                   />
