@@ -1,69 +1,65 @@
-# **🧑‍🎓 Studentious \- Next-Gen Educational Platform**
+# 🧑‍🎓 Studentious - Next-Gen Educational Platform
 
-\<p align="center"\>  
-A comprehensive full-stack educational platform built with Next.js and MongoDB. Studentious goes beyond a traditional LMS by integrating AI-driven course summarization, text-to-speech functionality, and real-time video/text collaboration.  
-\</p\>
+<p align="center">
+  A comprehensive full-stack educational platform built with Next.js and MongoDB. Studentious goes beyond a traditional LMS by integrating AI-driven course summarization, text-to-speech functionality, and real-time video/text collaboration.
+</p>
 
-## **📱 Screenshots & Demo**
+## 📱 Screenshots & Demo
 
-\<p align="center"\>  
-A visual tour of the Studentious platform, from AI summaries to live collaboration.  
-\</p\>  
-\<table border="0"\>  
-\<tr\>  
-\<td align="center" valign="top" colspan="2"\>  
-\<h3\>📚 Dashboard & Course Management\</h3\>  
-\</td\>  
-\</tr\>  
-\<tr\>  
-\<td align="center"\>  
-\<img src="./screenshots/dashboard.jpg" width="220" alt="User Dashboard"\>
+<p align="center">
+  A visual tour of the Studentious platform, from AI summaries to live collaboration.
+</p>
 
-\<em\>Custom User Dashboard (Role-based)\</em\>  
-\</td\>  
-\<td align="center"\>  
-\<img src="./screenshots/courses.jpg" width="220" alt="Course Materials"\>
+<table border="0">
+  <tr>
+    <td align="center" valign="top" colspan="2">
+      <h3>📚 Dashboard & Course Management</h3>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="./screenshots/dashboard.jpg" width="220" alt="User Dashboard">
+      <br><em>Custom User Dashboard (Role-based)</em>
+    </td>
+    <td align="center">
+      <img src="./screenshots/courses.jpg" width="220" alt="Course Materials">
+      <br><em>Document & Material Uploads</em>
+    </td>
+  </tr>
 
-\<em\>Document & Material Uploads\</em\>  
-\</td\>  
-\</tr\>  
-\<tr\>  
-\<td align="center" valign="top" colspan="2"\>
+  <tr>
+    <td align="center" valign="top" colspan="2">
+      <br><h3>🧠 AI Summarization & Text-to-Speech</h3>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="./screenshots/ai_summary.jpg" width="220" alt="AI Summary">
+      <br><em>Automated Course Summaries & Translation</em>
+    </td>
+    <td align="center">
+      <img src="./screenshots/audio.jpg" width="220" alt="ElevenLabs Audio">
+      <br><em>Listen to Summaries (ElevenLabs API)</em>
+    </td>
+  </tr>
 
-\<h3\>🧠 AI Summarization & Text-to-Speech\</h3\>  
-\</td\>  
-\</tr\>  
-\<tr\>  
-\<td align="center"\>  
-\<img src="./screenshots/ai\_summary.jpg" width="220" alt="AI Summary"\>
+  <tr>
+    <td align="center" valign="top" colspan="2">
+      <br><h3>🗣️ Real-Time Collaboration</h3>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="./screenshots/chat.jpg" width="220" alt="Live Chatrooms">
+      <br><em>Live Community Chatrooms</em>
+    </td>
+    <td align="center">
+      <img src="./screenshots/video.jpg" width="220" alt="Agora Video Chat">
+      <br><em>Video Conferencing via Agora</em>
+    </td>
+  </tr>
+</table>
 
-\<em\>Automated Course Summaries & Translation\</em\>  
-\</td\>  
-\<td align="center"\>  
-\<img src="./screenshots/audio.jpg" width="220" alt="ElevenLabs Audio"\>
-
-\<em\>Listen to Summaries (ElevenLabs API)\</em\>  
-\</td\>  
-\</tr\>  
-\<tr\>  
-\<td align="center" valign="top" colspan="2"\>
-
-\<h3\>🗣️ Real-Time Collaboration\</h3\>  
-\</td\>  
-\</tr\>  
-\<tr\>  
-\<td align="center"\>  
-\<img src="./screenshots/chat.jpg" width="220" alt="Live Chatrooms"\>
-
-\<em\>Live Community Chatrooms\</em\>  
-\</td\>  
-\<td align="center"\>  
-\<img src="./screenshots/video.jpg" width="220" alt="Agora Video Chat"\>
-
-\<em\>Video Conferencing via Agora\</em\>  
-\</td\>  
-\</tr\>  
-\</table\>
 
 ## **🚀 Key Features**
 
