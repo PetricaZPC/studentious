@@ -687,7 +687,7 @@ export default function PersonalCoursesContent() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {courses.map(course => (
                     <div 
                       key={course._id} 
@@ -784,6 +784,13 @@ export default function PersonalCoursesContent() {
                                 <IoTime className="h-3 w-3 mr-1.5" />
                                 <span>Generated: {course.audioGeneratedAt ? new Date(course.audioGeneratedAt).toLocaleString() : 'Recently'}</span>
                               </div>
+                              {currentlyPlaying === course._id && (
+                                <div className="mt-3 p-3 bg-white/50 rounded-lg">
+                                  <p className="text-xs text-blue-800 line-clamp-4">
+                                    {course.summarized ? course.summary : course.description}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

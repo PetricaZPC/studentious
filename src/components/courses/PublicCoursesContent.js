@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { IoDocument, IoSparkles, IoWarning, IoCalendar, IoEye, IoSearch, IoClose } from 'react-icons/io5';
 import { BsTranslate } from 'react-icons/bs';
 import { useAuth } from '@/context/AuthContext';
+import CourseViewer from './CourseViewer';
 
 export default function PublicCoursesContent() {
   const { user } = useAuth();
@@ -10,6 +11,7 @@ export default function PublicCoursesContent() {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingSummary, setViewingSummary] = useState(null);
+  const [viewingCourse, setViewingCourse] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [isTranslating, setIsTranslating] = useState(false);
   const [translatingCourseId, setTranslatingCourseId] = useState(null);
@@ -39,6 +41,14 @@ export default function PublicCoursesContent() {
   
   const viewSummary = (course) => {
     setViewingSummary(course);
+  };
+  
+  const viewCourse = (course) => {
+    setViewingCourse(course);
+  };
+  
+  const closeViewer = () => {
+    setViewingCourse(null);
   };
   
   const closeSummaryViewer = () => {
@@ -219,11 +229,18 @@ export default function PublicCoursesContent() {
                   
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => viewSummary(course)}
-                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 shadow-sm transition-colors duration-200"
+                      onClick={() => viewCourse(course)}
+                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors duration-200"
                     >
                       <IoEye className="h-3.5 w-3.5 mr-1.5" />
                       View
+                    </button>
+                    <button
+                      onClick={() => viewSummary(course)}
+                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 shadow-sm transition-colors duration-200"
+                    >
+                      <IoSparkles className="h-3.5 w-3.5 mr-1.5" />
+                      Summary
                     </button>
                   </div>
                 </div>
@@ -354,6 +371,11 @@ export default function PublicCoursesContent() {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Course Viewer Modal */}
+      {viewingCourse && (
+        <CourseViewer course={viewingCourse} onClose={closeViewer} />
       )}
     </div>
   );

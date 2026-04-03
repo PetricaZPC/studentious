@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { IoClose, IoDocument, IoVolumeHigh, IoPause, IoPlay, IoCheckmarkCircle, IoWarning, IoCalendar, IoTime, IoEye, IoCloudDownload, IoSparkles, IoMenu } from 'react-icons/io5';
 import { BsTranslate } from 'react-icons/bs';
+import CourseViewer from '../courses/CourseViewer';
 
 export default function CoursesContent() {
   const { user } = useAuth();
@@ -738,6 +739,13 @@ export default function CoursesContent() {
                                       <IoTime className="h-3 w-3 mr-1.5" />
                                       <span>Generated: {course.audioGeneratedAt ? new Date(course.audioGeneratedAt).toLocaleString() : 'Recently'}</span>
                                     </div>
+                                    {currentlyPlaying === course._id && (
+                                      <div className="mt-3 p-3 bg-white/50 rounded-lg">
+                                        <p className="text-xs text-blue-800 line-clamp-4">
+                                          {course.summarized ? course.summary : course.description}
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -997,7 +1005,10 @@ export default function CoursesContent() {
             </div>
           )}
           
-          {/* Similar changes for your other modal (viewingCourse) */}
+          {/* Course Viewer Modal */}
+          {viewingCourse && (
+            <CourseViewer course={viewingCourse} onClose={closeViewer} />
+          )}
         </div>
       </div>
     </div>

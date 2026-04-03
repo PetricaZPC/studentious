@@ -36,8 +36,8 @@ export default function Login() {
   <Head>
     <title>{isLoginForm ? 'Login' : 'Sign Up'} | Studentious</title>
   </Head>
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
-    <div className="max-w-md w-full space-y-8">
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 py-8 px-2 sm:px-6 lg:px-8">
+    <div className="w-full max-w-xs sm:max-w-md space-y-8">
       <div className="text-center">
         <div className="mx-auto h-16 w-16 bg-gradient-to-r from-purple-600 to-blue-500 rounded-lg flex items-center justify-center shadow-lg mb-6">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">

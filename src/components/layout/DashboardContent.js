@@ -64,10 +64,10 @@ export default function DashboardContent() {
       >
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-semibold text-black dark:text-white">
               {event.title}
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mt-1">{event.description}</p>
+            <p className="text-black dark:text-gray-300 mt-1">{event.description}</p>
           </div>
           {isToday && (
             <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">
@@ -77,7 +77,7 @@ export default function DashboardContent() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center text-sm text-black dark:text-gray-400">
             <svg
               className="w-4 h-4 mr-1"
               fill="none"
@@ -152,7 +152,7 @@ export default function DashboardContent() {
               Join Event
             </button>
           )}
-          <button className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-md transition-colors dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200">
+          <button className="text-xs bg-gray-100 hover:bg-gray-200 text-black px-3 py-1 rounded-md transition-colors dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200">
             View Details
           </button>
           {event.uploadedBy === user.uid && (
@@ -168,7 +168,7 @@ export default function DashboardContent() {
   const renderSection = (title, events, emptyMessage) => {
     if (loading) return <LoadingSpinner className="my-8" />;
     if (error) return <p className="text-red-500">{error}</p>;
-    if (events.length === 0) return <p className="text-gray-500">{emptyMessage}</p>;
+    if (events.length === 0) return <p className="text-black">{emptyMessage}</p>;
     
     return (
       <div className="space-y-4 overflow-y-auto max-h-96">
