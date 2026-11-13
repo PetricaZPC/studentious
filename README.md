@@ -93,10 +93,29 @@ JWT\_SECRET=your\_jwt\_secret\_key
 ELEVENLABS\_API\_KEY=your\_elevenlabs\_key  
 AGORA\_APP\_ID=your\_agora\_app\_id  
 AGORA\_APP\_CERTIFICATE=your\_agora\_certificate  
-AI\_API\_KEY=your\_ai\_translation\_and\_summary\_key
+GEMINI\_AI\_API\_KEY=your\_gemini\_key (summaries, translation; the assistant also accepts GEMINI\_API\_KEY)
+
+Optional: `GEMINI_MODEL` (default `gemini-2.5-flash`), `ELEVENLABS_MODEL_ID` (default `eleven_multilingual_v2`), `MONGODB_DB_NAME` (default `studentious`).
 
 ### **4\. Run the development server**
 
 npm run dev
 
 Open [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000) with your browser to see the result.
+
+## **🎮 Demo mode**
+
+The login page has a **Try application** button that opens the app immediately: no account, no sign-up and **no database**.
+Sample data (two public courses, a private sample course with a ready-made summary, three upcoming events and two chat rooms)
+is stored in the visitor's own browser (`localStorage`), and `src/utils/demoClient.js` answers the `/api/*` calls (fetch and
+axios) from it while demo mode is on. Nothing is sent to or saved on the server. Logging out, or clearing the site data,
+removes the demo. Normal sign-in and sign-up are unchanged and still use MongoDB. The sample PDFs live in `public/demo/`.
+In the demo, the teacher password asked on the account page is `1234` (the same one the app checks).
+
+Known limitations of the demo:
+
+- Summaries of new uploads, translation, the AI assistant and audio are unavailable or show static text: the real features use
+  **free API keys (Google Gemini, ElevenLabs) that have most likely expired or hit their quota**. The sample courses already
+  include summaries.
+- Video chat needs live Agora credentials and does not work in the demo.
+- Other visitors never see your events, messages or courses.

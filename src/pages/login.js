@@ -10,7 +10,7 @@ export default function Login() {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, signup } = useAuth();
+  const { login, signup, demoLogin } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e) => {
@@ -19,14 +19,32 @@ export default function Login() {
     setLoading(true);
 
     try {
-      if (isLoginForm) {
-        await login(email, password);
+      const result = isLoginForm
+        ? await login(email, password)
+        : await signup(email, password, fullName);
+      if (result && result.success === false) {
+        setError(result.error || 'Something went wrong');
       } else {
-        await signup(email, password, fullName);
+        router.push('/');
       }
-      router.push('/');
     } catch (error) {
       setError(error.message);
+    }
+    setLoading(false);
+  };
+
+  const handleDemo = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await demoLogin();
+      if (result.success) {
+        router.push('/');
+        return;
+      }
+      setError(result.error);
+    } catch (err) {
+      setError(err.message || 'Could not start the demo');
     }
     setLoading(false);
   };
@@ -163,6 +181,20 @@ export default function Login() {
             ) : isLoginForm ? 'Sign In' : 'Create Account'}
           </button>
         </form>
+
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleDemo}
+            disabled={loading}
+            className="w-full py-3 px-4 rounded-lg font-medium text-purple-700 border border-purple-300 bg-purple-50 hover:bg-purple-100 disabled:opacity-60 transition-all"
+          >
+            Try application
+          </button>
+          <p className="mt-2 text-xs text-gray-500 text-center">
+            Opens the app with sample courses and events. No account and no database: the data stays in your browser.
+          </p>
+        </div>
 
         <div className="mt-6 text-center text-sm text-gray-600">
           {isLoginForm ? "Don't have an account?" : "Already have an account?"}

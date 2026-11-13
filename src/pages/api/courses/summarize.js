@@ -8,6 +8,9 @@ import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// The retired "gemini-pro" model was replaced; override with GEMINI_MODEL if needed.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
 // Add API configuration to prevent timeouts for longer summaries
 export const config = {
   api: {
@@ -55,7 +58,10 @@ export default async function handler(req, res) {
 
     // Determine file path
     let filePath;
-    if (course.storedFilePath) {
+    if (typeof course.fileUrl === 'string' && course.fileUrl.startsWith('/demo/')) {
+      // Sample course bundled with the demo (see src/utils/demoSeed.js)
+      filePath = path.join(process.cwd(), 'public', 'demo', path.basename(course.fileUrl));
+    } else if (course.storedFilePath) {
       filePath = course.storedFilePath;
     } else if (course.storedFileName) {
       filePath = path.join(process.cwd(), 'public', 'uploads', 'courses', course.storedFileName);
@@ -109,25 +115,20 @@ export default async function handler(req, res) {
     // Truncate text only if extremely long
     const truncatedText = text.length > 25000 ? text.slice(0, 25000) + '...' : text;
 
-    // Check if API key is properly set
-    if (!process.env.GEMINI_AI_API_KEY) {
-      console.error('Gemini API key not set');
-      return res.status(500).json({ 
-        message: 'AI service not configured',
-        details: 'Gemini API key is missing'
-      });
-    }
+    // Without an API key we skip the AI calls and fall back to the extractive summary below.
+    const aiAvailable = Boolean(process.env.GEMINI_AI_API_KEY);
 
     // Update language detection logic to respect the requested output language
-    let detectedLanguage = outputLanguage;
     let originalLanguage = "en";
-    
-    try {
-      // Still detect original language for informational purposes
-      originalLanguage = await detectDocumentLanguage(truncatedText);
-    } catch (error) {
-      console.error('Language detection error:', error);
-      // Continue with requested language as default
+
+    if (aiAvailable) {
+      try {
+        // Still detect original language for informational purposes
+        originalLanguage = await detectDocumentLanguage(truncatedText);
+      } catch (error) {
+        console.error('Language detection error:', error);
+        // Continue with requested language as default
+      }
     }
     
     // Build a more specific prompt based on the options
@@ -234,6 +235,7 @@ export default async function handler(req, res) {
     let summaryType = 'extraction';
     
     try {
+      if (!aiAvailable) throw new Error('Gemini API key is not configured');
       summary = await generateComprehensiveSummary(promptTemplate);
       summaryType = 'ai';
     } catch (error) {
@@ -297,8 +299,8 @@ async function detectDocumentLanguage(text) {
   
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_AI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+
     // Take sample for language detection
     const sampleText = text.slice(0, 1000);
     
@@ -335,8 +337,8 @@ async function generateComprehensiveSummary(promptTemplate) {
   
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_AI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+
     const result = await model.generateContent(promptTemplate);
     if (!result || !result.response) {
       throw new Error('Invalid response from Gemini API');

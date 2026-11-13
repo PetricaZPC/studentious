@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     // Check API key first to fail fast
     if (!process.env.GEMINI_AI_API_KEY) {
       console.error('Missing Gemini API key for translation');
-      return res.status(500).json({ message: 'Translation service not configured properly' });
+      return res.status(503).json({ message: 'Translation is unavailable: the free Gemini API key is missing or has expired.' });
     }
 
     const client = await clientPromise;
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_AI_API_KEY);
     
     // Use the correct model name and version (updated from v1beta)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.5-flash" });
     
     // Language mapping to full names
     const languageMap = {

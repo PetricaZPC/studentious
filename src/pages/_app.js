@@ -2,8 +2,13 @@ import { AuthProvider } from '@/context/AuthContext';
 import '../styles/globals.css';
 import { useRouter } from 'next/router';
 import AuthGuard from '@/components/AuthGuard';
+import DemoBanner from '@/components/DemoBanner';
+import { installDemoClient } from '@/utils/demoClient';
 import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
+
+// Must run before any page effect fetches data, so it is done at module load (browser only).
+installDemoClient();
 
 if (typeof window === 'undefined') {
   import('./api/scheduler').catch(console.error);
@@ -35,6 +40,7 @@ function MyApp({ Component, pageProps }) {
           <Component {...pageProps} />
         </AuthGuard>
       )}
+      <DemoBanner />
     </AuthProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId, GridFSBucket } from 'mongodb';
 import clientPromise from '../../auth/mongodb';
 
 export default async function handler(req, res) {
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     }
     
     // Create bucket
-    const bucket = new mongodb.GridFSBucket(db, {
+    const bucket = new GridFSBucket(db, {
       bucketName: 'courses'
     });
     

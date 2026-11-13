@@ -75,7 +75,10 @@ export default async function handler(req, res) {
       }
     } catch (mkdirError) {
       console.error('Error creating directory:', mkdirError);
-      return res.status(500).json({ message: 'Failed to create directory', error: mkdirError.message });
+      return res.status(501).json({
+        message: 'File uploads are disabled on this deployment (read-only filesystem). Use the sample courses in the demo instead.',
+        error: mkdirError.message,
+      });
     }
 
     // Create a unique filename to avoid collisions

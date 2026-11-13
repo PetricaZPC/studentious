@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { startDemo } from '@/utils/demoClient';
 
 const AuthContext = createContext(null);
 
@@ -31,6 +32,7 @@ export function AuthProvider({ children }) {
             email: payload.email,
             fullName: payload.fullName || '',
             role: payload.role || 'student',
+            isDemo: Boolean(payload.isDemo),
           });
         } else {
           setUser(null);
@@ -73,7 +75,8 @@ export function AuthProvider({ children }) {
     const response = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, fullName }),
+      // The API reads `name`; `fullName` is kept for backwards compatibility.
+      body: JSON.stringify({ email, password, name: fullName, fullName }),
     });
 
     const payload = await response.json();
@@ -90,6 +93,24 @@ export function AuthProvider({ children }) {
     }
 
     return { success: false, error: payload.message || 'Signup failed' };
+  }
+
+  async function demoLogin() {
+    // Runs entirely in the browser (no account, no database): see src/utils/demoClient.js
+    try {
+      const demoUser = startDemo();
+      setUser({
+        id: demoUser.id,
+        uid: demoUser.id,
+        email: demoUser.email,
+        fullName: demoUser.fullName,
+        role: demoUser.role,
+        isDemo: true,
+      });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Could not start the demo. Please enable browser storage and try again.' };
+    }
   }
 
   async function logout() {
@@ -121,6 +142,7 @@ export function AuthProvider({ children }) {
       fullName: payload.fullName,
       id: payload.id,
       role: payload.role,
+      isDemo: Boolean(payload.isDemo),
     };
 
     setUser(refreshed);
@@ -132,6 +154,7 @@ export function AuthProvider({ children }) {
     loading,
     login,
     signup,
+    demoLogin,
     logout,
     refreshUser,
     isAuthenticated: Boolean(user),

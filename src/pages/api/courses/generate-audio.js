@@ -60,8 +60,11 @@ export default async function handler(req, res) {
       : text;
 
     // Call ElevenLabs API
-    // Use the dedicated ElevenLabs API key if available
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || process.env.GEMINI_AI_API_KEY;
+    // Only the dedicated ElevenLabs key is used (never send another provider's key to ElevenLabs)
+    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+    if (!ELEVENLABS_API_KEY) {
+      return res.status(503).json({ message: 'Audio generation is unavailable: no ElevenLabs API key is configured (the free key has probably expired).' });
+    }
     const ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Default voice - Rachel
     
     let audioBuffer;
@@ -76,7 +79,7 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             text: trimmedText,
-            model_id: "eleven_monolingual_v1",
+            model_id: process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2",
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.75
